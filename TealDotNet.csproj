@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>netcoreapp3.1</TargetFramework>
+        <LangVersion>latest</LangVersion>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <PackageReference Include="Sprache" Version="3.0.0-develop-00049" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\antlr4\Antlr4.csproj" />
+      <ProjectReference Include="..\dotnet-algorand-sdk\dotnet-algorand-sdk.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Compile Remove="Test.cs" />
+    </ItemGroup>
+
+</Project>
