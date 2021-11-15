@@ -140,13 +140,13 @@
 			Pushes = new[] {StackType.Uint64}
 		};
 		
-		public static Opcode and = new(0x10, "&&")
+		public static Opcode conditionnal_and = new(0x10, "&&")
 		{
 			Pops = new[] {StackType.Uint64, StackType.Uint64},
 			Pushes = new[] {StackType.Uint64}
 		};
 		
-		public static Opcode or = new(0x11, "||")
+		public static Opcode conditionnal_or = new(0x11, "||")
 		{
 			Pops = new[] {StackType.Uint64, StackType.Uint64},
 			Pushes = new[] {StackType.Uint64}
@@ -827,14 +827,14 @@
 			Pushes = new [] {StackType.Uint64}
 		};
 		
-		public static Opcode bequal_or_lesser_than = new(0xa6, "b<=")
+		public static Opcode blesser_than_or_equal = new(0xa6, "b<=")
 		{
 			Cost = new []{-1, -1, -1, 1, 1},
 			Pops = new [] {StackType.Bytes, StackType.Bytes},
 			Pushes = new [] {StackType.Uint64}
 		};
 		
-		public static Opcode bequal_or_greater_than = new(0xa7, "b>=")
+		public static Opcode bgreater_than_or_equal = new(0xa7, "b>=")
 		{
 			Cost = new []{-1, -1, -1, 1, 1},
 			Pops = new [] {StackType.Bytes, StackType.Bytes},
@@ -862,28 +862,28 @@
 			Pushes = new [] {StackType.Bytes}
 		};
 		
-		public static Opcode bor = new(0xab, "b|")
+		public static Opcode bbitwise_or = new(0xab, "b|")
 		{
 			Cost = new []{-1, -1, -1, 6, 6},
 			Pops = new [] {StackType.Bytes, StackType.Bytes},
 			Pushes = new [] {StackType.Bytes}
 		};
 		
-		public static Opcode band = new(0xac, "b&")
+		public static Opcode bbitwise_and = new(0xac, "b&")
 		{
 			Cost = new []{-1, -1, -1, 6, 6},
 			Pops = new [] {StackType.Bytes, StackType.Bytes},
 			Pushes = new [] {StackType.Bytes}
 		};
 		
-		public static Opcode bxor = new(0xad, "b^")
+		public static Opcode bbitwise_xor = new(0xad, "b^")
 		{
 			Cost = new []{-1, -1, -1, 6, 6},
 			Pops = new [] {StackType.Bytes, StackType.Bytes},
 			Pushes = new [] {StackType.Bytes}
 		};
 		
-		public static Opcode borcomplement = new(0xae, "b~")
+		public static Opcode bcomplement = new(0xae, "b~")
 		{
 			Cost = new []{-1, -1, -1, 4, 4},
 			Pops = new [] {StackType.Bytes},

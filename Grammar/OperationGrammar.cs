@@ -61,13 +61,11 @@ namespace TealCompiler
 		private OperatorList[] m_binaryOperatorPrecedence = 
 		{
 			new(){RightToLeft = true, List=new[]
-				{"=", "+=", "-=", "*=", "/=", "%=", "<<=", ">>=", "&=", "^=", "|="}},
+				{"="}},
 			new(){RightToLeft = true, List=new[]
 				{"?", ":"}},
 			new(){RightToLeft = false, List=new[]
 				{"||"}},
-			new(){RightToLeft = false, List=new[]
-				{"^^"}},
 			new(){RightToLeft = false, List=new[]
 				{"&&"}},
 			new(){RightToLeft = false, List=new[]
@@ -107,23 +105,18 @@ namespace TealCompiler
 		}
 
 		private Parser<string> PrefixUnaryOperator =>
-			new OperatorList() {List = new[] {"+", "-", "!", "~", "++", "--"}}.OperatorParser();
-		private Parser<string> SuffixUnaryOperator =>
-			new OperatorList() {List = new[] {"++", "--"}}.OperatorParser();
+			new OperatorList() {List = new[] {"!", "~"}}.OperatorParser();
 
 		private Parser<UnaryOperationInstruction> UnaryOperation =>
-			from prefixOp in PrefixUnaryOperator.Optional()
+			from prefixOp in PrefixUnaryOperator
 			from expression in
 				Parse.Ref(() => BinaryOperation).Contained(Parse.Char('(').Token(), Parse.Char(')').Token())
 					.XOr(Call.Or<Expression>(Variable))
 					.XOr(Const)
-			from suffixOp in SuffixUnaryOperator.Optional()
-			where prefixOp.IsDefined != suffixOp.IsDefined
 			select new UnaryOperationInstruction()
 			{
-				Operator = prefixOp.IsDefined ? prefixOp.Get() : suffixOp.Get(),
-				Value = expression,
-				Suffix = suffixOp.IsDefined
+				Operator = prefixOp,
+				Value = expression
 			};
 	}
 }

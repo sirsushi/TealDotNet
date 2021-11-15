@@ -208,7 +208,18 @@ namespace TealCompiler
 			}
 		}
 
-		public class Expression : Instruction { }
+		public class Expression : Instruction
+		{
+			public bool EvaluateToUint64()
+			{
+				return false;
+			}
+
+			public bool EvaluateToBytes()
+			{
+				return false;
+			}
+		}
 
 		public class ConstExpression : Expression { }
 
@@ -220,6 +231,11 @@ namespace TealCompiler
 			{
 				return Value.ToString();
 			}
+
+			public override IEnumerable<TealInstruction> ToTEAL()
+			{
+				yield return new OpcodeInstruction(Opcodes.pushint, Value);
+			}
 		}
 		
 		public class BytesConstExpression : ConstExpression
@@ -229,6 +245,11 @@ namespace TealCompiler
 			public override string ToString()
 			{
 				return $"\"{Encoding.UTF8.GetString(Value)}\"";
+			}
+
+			public override IEnumerable<TealInstruction> ToTEAL()
+			{
+				yield return new OpcodeInstruction(Opcodes.pushbytes, ToString());
 			}
 		}
 
@@ -242,6 +263,27 @@ namespace TealCompiler
 			{
 				return Suffix ? $"{Value}{Operator}" : $"{Operator}{Value}";
 			}
+
+			public override IEnumerable<TealInstruction> ToTEAL()
+			{
+				foreach (var l_instruction in Value.ToTEAL()) yield return l_instruction;
+
+				switch (Operator)
+				{
+					case "!":
+						if (Value.EvaluateToUint64())
+							yield return new OpcodeInstruction(Opcodes.not);
+						else
+							throw new InvalidOperationException("Can't do 'not' operation on []byte.");
+						break;
+					case "~":
+						if (Value.EvaluateToUint64())
+							yield return new OpcodeInstruction(Opcodes.complement);
+						else
+							yield return new OpcodeInstruction(Opcodes.bcomplement);
+						break;
+				}
+			}
 		}
 		
 		public class BinaryOperationInstruction : Expression
@@ -254,14 +296,287 @@ namespace TealCompiler
 			{
 				return $"({LeftValue} {Operator} {RightValue})";
 			}
+
+			public override IEnumerable<TealInstruction> ToTEAL()
+			{
+				switch (Operator)
+				{
+					case "+":
+						if (LeftValue.EvaluateToUint64() && RightValue.EvaluateToUint64())
+						{
+							foreach (var l_instruction in LeftValue.ToTEAL()) yield return l_instruction;
+							foreach (var l_instruction in RightValue.ToTEAL()) yield return l_instruction;
+							yield return new OpcodeInstruction(Opcodes.add);
+						}
+						else
+						{
+							foreach (var l_instruction in LeftValue.ToTEAL()) yield return l_instruction;
+							if (LeftValue.EvaluateToUint64())
+								yield return new OpcodeInstruction(Opcodes.itob);
+							foreach (var l_instruction in RightValue.ToTEAL()) yield return l_instruction;
+							if (RightValue.EvaluateToUint64())
+								yield return new OpcodeInstruction(Opcodes.itob);
+							yield return new OpcodeInstruction(Opcodes.badd);
+						}
+						break;
+					case "-":
+						if (LeftValue.EvaluateToUint64() && RightValue.EvaluateToUint64())
+						{
+							foreach (var l_instruction in LeftValue.ToTEAL()) yield return l_instruction;
+							foreach (var l_instruction in RightValue.ToTEAL()) yield return l_instruction;
+							yield return new OpcodeInstruction(Opcodes.sub);
+						}
+						else
+						{
+							foreach (var l_instruction in LeftValue.ToTEAL()) yield return l_instruction;
+							if (LeftValue.EvaluateToUint64())
+								yield return new OpcodeInstruction(Opcodes.itob);
+							foreach (var l_instruction in RightValue.ToTEAL()) yield return l_instruction;
+							if (RightValue.EvaluateToUint64())
+								yield return new OpcodeInstruction(Opcodes.itob);
+							yield return new OpcodeInstruction(Opcodes.bsub);
+						}
+						break;
+					case "*":
+						if (LeftValue.EvaluateToUint64() && RightValue.EvaluateToUint64())
+						{
+							foreach (var l_instruction in LeftValue.ToTEAL()) yield return l_instruction;
+							foreach (var l_instruction in RightValue.ToTEAL()) yield return l_instruction;
+							yield return new OpcodeInstruction(Opcodes.mul);
+						}
+						else
+						{
+							foreach (var l_instruction in LeftValue.ToTEAL()) yield return l_instruction;
+							if (LeftValue.EvaluateToUint64())
+								yield return new OpcodeInstruction(Opcodes.itob);
+							foreach (var l_instruction in RightValue.ToTEAL()) yield return l_instruction;
+							if (RightValue.EvaluateToUint64())
+								yield return new OpcodeInstruction(Opcodes.itob);
+							yield return new OpcodeInstruction(Opcodes.bmul);
+						}
+						break;
+					case "/":
+						if (LeftValue.EvaluateToUint64() && RightValue.EvaluateToUint64())
+						{
+							foreach (var l_instruction in LeftValue.ToTEAL()) yield return l_instruction;
+							foreach (var l_instruction in RightValue.ToTEAL()) yield return l_instruction;
+							yield return new OpcodeInstruction(Opcodes.div);
+						}
+						else
+						{
+							foreach (var l_instruction in LeftValue.ToTEAL()) yield return l_instruction;
+							if (LeftValue.EvaluateToUint64())
+								yield return new OpcodeInstruction(Opcodes.itob);
+							foreach (var l_instruction in RightValue.ToTEAL()) yield return l_instruction;
+							if (RightValue.EvaluateToUint64())
+								yield return new OpcodeInstruction(Opcodes.itob);
+							yield return new OpcodeInstruction(Opcodes.bdiv);
+						}
+						break;
+					case "%":
+						if (LeftValue.EvaluateToUint64() && RightValue.EvaluateToUint64())
+						{
+							foreach (var l_instruction in LeftValue.ToTEAL()) yield return l_instruction;
+							foreach (var l_instruction in RightValue.ToTEAL()) yield return l_instruction;
+							yield return new OpcodeInstruction(Opcodes.mod);
+						}
+						else
+						{
+							foreach (var l_instruction in LeftValue.ToTEAL()) yield return l_instruction;
+							if (LeftValue.EvaluateToUint64())
+								yield return new OpcodeInstruction(Opcodes.itob);
+							foreach (var l_instruction in RightValue.ToTEAL()) yield return l_instruction;
+							if (RightValue.EvaluateToUint64())
+								yield return new OpcodeInstruction(Opcodes.itob);
+							yield return new OpcodeInstruction(Opcodes.bmod);
+						}
+						break;
+					case "**":
+						if (LeftValue.EvaluateToUint64() && RightValue.EvaluateToUint64())
+						{
+							foreach (var l_instruction in LeftValue.ToTEAL()) yield return l_instruction;
+							foreach (var l_instruction in RightValue.ToTEAL()) yield return l_instruction;
+							yield return new OpcodeInstruction(Opcodes.exp);
+						}
+						else
+							throw new InvalidOperationException("Type []byte is not compatible with operation '**'");
+						break;
+					case "=":
+						if (LeftValue is not Variable) throw new InvalidOperationException("Trying to assign a value to something that is not a variable.");
+						foreach (var l_instruction in RightValue.ToTEAL()) yield return l_instruction;
+						break;
+					case "==":
+						foreach (var l_instruction in LeftValue.ToTEAL()) yield return l_instruction;
+						foreach (var l_instruction in RightValue.ToTEAL()) yield return l_instruction;
+						yield return new OpcodeInstruction(Opcodes.equal);
+						break;
+					case "!=":
+						foreach (var l_instruction in LeftValue.ToTEAL()) yield return l_instruction;
+						foreach (var l_instruction in RightValue.ToTEAL()) yield return l_instruction;
+						yield return new OpcodeInstruction(Opcodes.notequal);
+						break;
+					case "&&":
+						foreach (var l_instruction in LeftValue.ToTEAL()) yield return l_instruction;
+						foreach (var l_instruction in RightValue.ToTEAL()) yield return l_instruction;
+						yield return new OpcodeInstruction(Opcodes.conditionnal_and);
+						break;
+					case "||":
+						foreach (var l_instruction in LeftValue.ToTEAL()) yield return l_instruction;
+						foreach (var l_instruction in RightValue.ToTEAL()) yield return l_instruction;
+						yield return new OpcodeInstruction(Opcodes.conditionnal_or);
+						break;
+					case "&":
+						if (LeftValue.EvaluateToUint64() && RightValue.EvaluateToUint64())
+						{
+							foreach (var l_instruction in LeftValue.ToTEAL()) yield return l_instruction;
+							foreach (var l_instruction in RightValue.ToTEAL()) yield return l_instruction;
+							yield return new OpcodeInstruction(Opcodes.bitwise_and);
+						}
+						else
+						{
+							foreach (var l_instruction in LeftValue.ToTEAL()) yield return l_instruction;
+							if (LeftValue.EvaluateToUint64())
+								yield return new OpcodeInstruction(Opcodes.itob);
+							foreach (var l_instruction in RightValue.ToTEAL()) yield return l_instruction;
+							if (RightValue.EvaluateToUint64())
+								yield return new OpcodeInstruction(Opcodes.itob);
+							yield return new OpcodeInstruction(Opcodes.bbitwise_and);
+						}
+						break;
+					case "|":
+						if (LeftValue.EvaluateToUint64() && RightValue.EvaluateToUint64())
+						{
+							foreach (var l_instruction in LeftValue.ToTEAL()) yield return l_instruction;
+							foreach (var l_instruction in RightValue.ToTEAL()) yield return l_instruction;
+							yield return new OpcodeInstruction(Opcodes.bitwise_or);
+						}
+						else
+						{
+							foreach (var l_instruction in LeftValue.ToTEAL()) yield return l_instruction;
+							if (LeftValue.EvaluateToUint64())
+								yield return new OpcodeInstruction(Opcodes.itob);
+							foreach (var l_instruction in RightValue.ToTEAL()) yield return l_instruction;
+							if (RightValue.EvaluateToUint64())
+								yield return new OpcodeInstruction(Opcodes.itob);
+							yield return new OpcodeInstruction(Opcodes.bbitwise_or);
+						}
+						break;
+					case "^":
+						if (LeftValue.EvaluateToUint64() && RightValue.EvaluateToUint64())
+						{
+							foreach (var l_instruction in LeftValue.ToTEAL()) yield return l_instruction;
+							foreach (var l_instruction in RightValue.ToTEAL()) yield return l_instruction;
+							yield return new OpcodeInstruction(Opcodes.bitwise_xor);
+						}
+						else
+						{
+							foreach (var l_instruction in LeftValue.ToTEAL()) yield return l_instruction;
+							if (LeftValue.EvaluateToUint64())
+								yield return new OpcodeInstruction(Opcodes.itob);
+							foreach (var l_instruction in RightValue.ToTEAL()) yield return l_instruction;
+							if (RightValue.EvaluateToUint64())
+								yield return new OpcodeInstruction(Opcodes.itob);
+							yield return new OpcodeInstruction(Opcodes.bbitwise_xor);
+						}
+						break;
+					case "<":
+						if (LeftValue.EvaluateToUint64() && RightValue.EvaluateToUint64())
+						{
+							foreach (var l_instruction in LeftValue.ToTEAL()) yield return l_instruction;
+							foreach (var l_instruction in RightValue.ToTEAL()) yield return l_instruction;
+							yield return new OpcodeInstruction(Opcodes.lesser_than);
+						}
+						else
+						{
+							foreach (var l_instruction in LeftValue.ToTEAL()) yield return l_instruction;
+							if (LeftValue.EvaluateToUint64())
+								yield return new OpcodeInstruction(Opcodes.itob);
+							foreach (var l_instruction in RightValue.ToTEAL()) yield return l_instruction;
+							if (RightValue.EvaluateToUint64())
+								yield return new OpcodeInstruction(Opcodes.itob);
+							yield return new OpcodeInstruction(Opcodes.blesser_than);
+						}
+						break;
+					case ">":
+						if (LeftValue.EvaluateToUint64() && RightValue.EvaluateToUint64())
+						{
+							foreach (var l_instruction in LeftValue.ToTEAL()) yield return l_instruction;
+							foreach (var l_instruction in RightValue.ToTEAL()) yield return l_instruction;
+							yield return new OpcodeInstruction(Opcodes.greater_than);
+						}
+						else
+						{
+							foreach (var l_instruction in LeftValue.ToTEAL()) yield return l_instruction;
+							if (LeftValue.EvaluateToUint64())
+								yield return new OpcodeInstruction(Opcodes.itob);
+							foreach (var l_instruction in RightValue.ToTEAL()) yield return l_instruction;
+							if (RightValue.EvaluateToUint64())
+								yield return new OpcodeInstruction(Opcodes.itob);
+							yield return new OpcodeInstruction(Opcodes.bgreater_than);
+						}
+						break;
+					case "<=":
+						if (LeftValue.EvaluateToUint64() && RightValue.EvaluateToUint64())
+						{
+							foreach (var l_instruction in LeftValue.ToTEAL()) yield return l_instruction;
+							foreach (var l_instruction in RightValue.ToTEAL()) yield return l_instruction;
+							yield return new OpcodeInstruction(Opcodes.lesser_than_or_equal);
+						}
+						else
+						{
+							foreach (var l_instruction in LeftValue.ToTEAL()) yield return l_instruction;
+							if (LeftValue.EvaluateToUint64())
+								yield return new OpcodeInstruction(Opcodes.itob);
+							foreach (var l_instruction in RightValue.ToTEAL()) yield return l_instruction;
+							if (RightValue.EvaluateToUint64())
+								yield return new OpcodeInstruction(Opcodes.itob);
+							yield return new OpcodeInstruction(Opcodes.blesser_than_or_equal);
+						}
+						break;
+					case ">=":
+						if (LeftValue.EvaluateToUint64() && RightValue.EvaluateToUint64())
+						{
+							foreach (var l_instruction in LeftValue.ToTEAL()) yield return l_instruction;
+							foreach (var l_instruction in RightValue.ToTEAL()) yield return l_instruction;
+							yield return new OpcodeInstruction(Opcodes.greater_than_or_equal);
+						}
+						else
+						{
+							foreach (var l_instruction in LeftValue.ToTEAL()) yield return l_instruction;
+							if (LeftValue.EvaluateToUint64())
+								yield return new OpcodeInstruction(Opcodes.itob);
+							foreach (var l_instruction in RightValue.ToTEAL()) yield return l_instruction;
+							if (RightValue.EvaluateToUint64())
+								yield return new OpcodeInstruction(Opcodes.itob);
+							yield return new OpcodeInstruction(Opcodes.bgreater_than_or_equal);
+						}
+						break;
+					case "<<":
+						if (LeftValue.EvaluateToUint64() && RightValue.EvaluateToUint64())
+						{
+							foreach (var l_instruction in LeftValue.ToTEAL()) yield return l_instruction;
+							foreach (var l_instruction in RightValue.ToTEAL()) yield return l_instruction;
+							yield return new OpcodeInstruction(Opcodes.shl);
+						}
+						else
+							throw new InvalidOperationException("Type []byte is not compatible with operation '<<'");
+
+						break;
+					case ">>":
+						if (LeftValue.EvaluateToUint64() && RightValue.EvaluateToUint64())
+						{
+							foreach (var l_instruction in LeftValue.ToTEAL()) yield return l_instruction;
+							foreach (var l_instruction in RightValue.ToTEAL()) yield return l_instruction;
+							yield return new OpcodeInstruction(Opcodes.shr);
+						}
+						else
+							throw new InvalidOperationException("Type []byte is not compatible with operation '>>'");
+						break;
+				}
+			}
 		}
 
-		public class LineExpression : Expression
-		{
-			
-		}
-
-		public class CallInstruction : LineExpression
+		public class CallInstruction : Expression
 		{
 			public string FunctionName { get; set; }
 			public Expression[] Parameters { get; set; }
@@ -269,6 +584,11 @@ namespace TealCompiler
 			public override string ToString()
 			{
 				return $"{FunctionName}({string.Join(", ", Parameters.Select(param => param.ToString()))})";
+			}
+
+			public override IEnumerable<TealInstruction> ToTEAL()
+			{
+				yield return new OpcodeInstruction(Opcodes.callsub, FunctionName);
 			}
 		}
 
