@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using TealCompiler.TealGenerator.Assembly;
@@ -11,9 +12,12 @@ namespace TealCompiler
 		{
 			public Function[] Functions { get; set; }
 
-			public IEnumerable<Opcode> ToTEAL()
+			public IEnumerable<TealInstruction> ToApprovalProgram()
 			{
-				yield break;
+				Function l_approvalProgram = Functions.FirstOrDefault(f => f.Name == "ApprovalProgram");
+				if (l_approvalProgram == null) throw new InvalidOperationException("ApprovalProgram() function is not present in the file.");
+
+				foreach (var l_instruction in l_approvalProgram.ToTEAL(true)) yield return l_instruction;
 			}
 		}
 
@@ -27,6 +31,18 @@ namespace TealCompiler
 			{
 				return $"{Name}({string.Join(", ", Parameters)})";
 			}
+
+			public IEnumerable<TealInstruction> ToTEAL(bool p_main = false)
+			{
+				yield return new LabelInstruction(Name);
+
+				foreach (var l_instruction in Block.ToTEAL()) yield return l_instruction;
+
+				if (p_main)
+					yield return new OpcodeInstruction(Opcodes.@return);
+				else
+					yield return new OpcodeInstruction(Opcodes.retsub);
+			}
 		}
 
 		public class CodeBlock
@@ -37,9 +53,23 @@ namespace TealCompiler
 			{
 				return $"{{{Instructions.Length}}}";
 			}
+
+			public IEnumerable<TealInstruction> ToTEAL()
+			{
+				foreach (Instruction l_instruction in Instructions)
+				{
+					foreach (var l_tealInstruction in l_instruction.ToTEAL()) yield return l_tealInstruction;
+				}
+			}
 		}
 
-		public class Instruction { }
+		public class Instruction
+		{
+			public virtual IEnumerable<TealInstruction> ToTEAL()
+			{
+				yield break;
+			}
+		}
 
 		public class IfInstruction : Instruction
 		{
@@ -50,6 +80,37 @@ namespace TealCompiler
 			public override string ToString()
 			{
 				return $"if {Condition} {IfBlock}" + (ElseBlock != null ? $"else {ElseBlock}" : "");
+			}
+
+			public override IEnumerable<TealInstruction> ToTEAL()
+			{
+				foreach (var l_instruction in Condition.ToTEAL()) yield return l_instruction;
+
+				Guid l_id = Guid.NewGuid();
+				if (ElseBlock != null)
+				{
+					// if NOT condition => jump else
+					yield return new OpcodeInstruction(Opcodes.bz, l_id.ToString() + "_else");
+
+					foreach (var l_instruction in IfBlock.ToTEAL()) yield return l_instruction;
+
+					// jump endif
+					yield return new OpcodeInstruction(Opcodes.b, l_id.ToString() + "_endif");
+					yield return new LabelInstruction(l_id.ToString() + "_else");
+
+					foreach (var l_instruction in ElseBlock.ToTEAL()) yield return l_instruction;
+					
+					yield return new LabelInstruction(l_id.ToString() + "_endif");
+				}
+				else
+				{
+					// if NOT condition => jump endif
+					yield return new OpcodeInstruction(Opcodes.bz, l_id.ToString() + "_endif");
+
+					foreach (var l_instruction in IfBlock.ToTEAL()) yield return l_instruction;
+
+					yield return new LabelInstruction(l_id.ToString() + "_endif");
+				}
 			}
 		}
 
@@ -85,6 +146,54 @@ namespace TealCompiler
 			public override string ToString()
 			{
 				return $"switch {TestedValue} {{ {(Cases.Length > 0 ? $"{Cases.Length} case(s)" : "")} {(DefaultCase != null ? "+ default" : "")} }}";
+			}
+
+			public override IEnumerable<TealInstruction> ToTEAL()
+			{
+				if (Cases.Length == 0 && DefaultCase == null)
+				{
+					yield break;
+				}
+
+				CodeBlock l_block = DefaultCase;
+
+				for (int i = Cases.Length - 1; i >= 0; i--)
+				{
+					Expression l_condition = new BinaryOperationInstruction()
+					{
+						Operator = "==",
+						LeftValue = TestedValue,
+						RightValue = Cases[i].Values[0]
+					};
+					for (int j = 1; j < Cases[i].Values.Length; j++)
+					{
+						l_condition = new BinaryOperationInstruction()
+						{
+							Operator = "||",
+							LeftValue = new BinaryOperationInstruction()
+							{
+								Operator = "==",
+								LeftValue = TestedValue,
+								RightValue = Cases[i].Values[j]
+							},
+							RightValue = l_condition
+						};
+					}
+					l_block = new CodeBlock()
+					{
+						Instructions = new Instruction[]
+						{
+							new IfInstruction()
+							{
+								Condition = l_condition,
+								IfBlock = Cases[i].Block,
+								ElseBlock = l_block
+							}
+						}
+					};
+				}
+
+				foreach (var l_instruction in l_block.ToTEAL()) yield return l_instruction;
 			}
 		}
 
