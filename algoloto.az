@@ -1,0 +1,73 @@
+#define Master @ABC123
+
+def ApprovalProgram() {
+	if (Txn.Type != ApplicationCall || Txn.GroupIndex != 0) return false;
+	
+	// App creation
+	if (Txn.ApplicationID == 0) {
+		CreateApplication();
+		return true;
+	}
+	
+	switch (Txn.OnComplete) {
+		case NoOp {
+			ExecuteNoOp();
+		}
+		case OptIn {
+			ExecuteOptIn();
+		}
+		case CloseOut {
+			ExecuteCloseOut();
+		}
+		case UpdateApplication {
+			ExecuteUpdateApplication();
+		}
+		case DeleteApplication {
+			ExecuteDeleteApplication();
+		}
+	}
+}
+
+def CreateApplication() {
+}
+
+def ExecuteNoOp() {
+	switch (args[0]) {
+		case "open": {
+		}
+		case "close": {
+		}
+		case "draw": {
+		}
+		case "buy": {
+		}
+		case "claim": {
+		}
+		case "register": {
+		}
+	}
+}
+
+def ExecuteOptIn() {
+	if (Gtxn[1].Type != Payment) exit false;
+	if (Gtxn[1].RekeyTo != Global.CurrentApplicationAddress) exit false;
+	if (Gtxn[1].Amount != 0) exit false;
+	if (Gtxn[1].Type != Payment) exit false;
+	exit true;
+}
+
+def ExecuteCloseOut() {
+	exit true;
+}
+
+def ExecuteUpdateApplication() {
+	exit Txn.Sender == Master;
+}
+
+def ExecuteDeleteApplication() {
+	exit txt.Sender == Master;
+}
+
+def ClearStateProgram() {
+	ExecuteCloseOut();
+}
