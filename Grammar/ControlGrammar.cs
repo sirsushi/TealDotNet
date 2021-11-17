@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using Sprache;
-using TealCompiler.Tokens;
+using TealCompiler.AbstractSyntaxTree;
 
 namespace TealCompiler
 {

@@ -1,6 +1,6 @@
 using System.Linq;
 using Sprache;
-using TealCompiler.Tokens;
+using TealCompiler.AbstractSyntaxTree;
 
 namespace TealCompiler
 {
@@ -32,7 +32,7 @@ namespace TealCompiler
 			from functions in Function.Token().XMany()
 			select new Program()
 			{
-				Functions = functions.ToArray()
+				Functions = functions.ToList()
 			};
 
 		private static readonly Parser<string> StringLiteral =

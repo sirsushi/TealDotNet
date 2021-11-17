@@ -4,7 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text;
 using Sprache;
-using TealCompiler.Tokens;
+using TealCompiler.AbstractSyntaxTree;
 
 namespace TealCompiler
 {

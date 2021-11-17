@@ -1,5 +1,5 @@
 ﻿using Sprache;
-using TealCompiler.Tokens;
+using TealCompiler.AbstractSyntaxTree;
 
 namespace TealCompiler
 {

@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Sprache;
-using TealCompiler.Tokens;
+using TealCompiler.AbstractSyntaxTree;
 
 namespace TealCompiler
 {
@@ -15,7 +15,7 @@ namespace TealCompiler
 			select new Function()
 			{
 				Name = name,
-				Parameters = parameters.ToArray(),
+				Parameters = parameters.ToList(),
 				Block = block
 			};
 
@@ -31,13 +31,13 @@ namespace TealCompiler
 				.Contained(Parse.Char('{').Token(), Parse.Char('}').Token())
 			select new CodeBlock()
 			{
-				Instructions = instructions.ToArray()
+				Instructions = instructions.ToList()
 			};
 
 		private Parser<CodeBlock> SimplifiedCodeBlock =>
 			CodeBlock.Or(Instruction.Once().Select(instr => new CodeBlock()
 			{
-				Instructions = instr.ToArray()
+				Instructions = instr.ToList()
 			}));
 
 		private Parser<CallInstruction> Call =>
