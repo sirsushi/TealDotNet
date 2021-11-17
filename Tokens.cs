@@ -61,11 +61,35 @@ namespace TealCompiler
 					foreach (var l_tealInstruction in l_instruction.ToTEAL()) yield return l_tealInstruction;
 				}
 			}
+
+			public IEnumerable<TInstruction> Find<TInstruction>() where TInstruction : Instruction
+			{
+				foreach (Instruction l_instruction in Instructions)
+				{
+					if (l_instruction is TInstruction)
+						yield return (TInstruction)l_instruction;
+					foreach (TInstruction l_subInstruction in l_instruction.Find<TInstruction>())
+					{
+						yield return l_subInstruction;
+					}
+				}
+			}
 		}
 
 		public class Instruction
 		{
-			public virtual IEnumerable<TealInstruction> ToTEAL()
+			public IEnumerable<TealInstruction> ToTEAL()
+			{
+				yield return new CommentInstruction(ToString());
+				foreach (var l_instruction in ToTEALInternal()) yield return l_instruction;
+			}
+
+			protected virtual IEnumerable<TealInstruction> ToTEALInternal()
+			{
+				yield break;
+			}
+
+			public virtual IEnumerable<TInstruction> Find<TInstruction>()
 			{
 				yield break;
 			}
@@ -82,7 +106,7 @@ namespace TealCompiler
 				return $"if {Condition} {IfBlock}" + (ElseBlock != null ? $"else {ElseBlock}" : "");
 			}
 
-			public override IEnumerable<TealInstruction> ToTEAL()
+			protected override IEnumerable<TealInstruction> ToTEALInternal()
 			{
 				foreach (var l_instruction in Condition.ToTEAL()) yield return l_instruction;
 
@@ -148,7 +172,7 @@ namespace TealCompiler
 				return $"switch {TestedValue} {{ {(Cases.Length > 0 ? $"{Cases.Length} case(s)" : "")} {(DefaultCase != null ? "+ default" : "")} }}";
 			}
 
-			public override IEnumerable<TealInstruction> ToTEAL()
+			protected override IEnumerable<TealInstruction> ToTEALInternal()
 			{
 				if (Cases.Length == 0 && DefaultCase == null)
 				{
@@ -210,14 +234,19 @@ namespace TealCompiler
 
 		public class Expression : Instruction
 		{
+			public virtual StackType EvaluateTo()
+			{
+				return StackType.Any;
+			}
+			
 			public bool EvaluateToUint64()
 			{
-				return false;
+				return EvaluateTo() == StackType.Uint64;
 			}
 
 			public bool EvaluateToBytes()
 			{
-				return false;
+				return EvaluateTo() == StackType.Bytes;
 			}
 		}
 
@@ -232,7 +261,12 @@ namespace TealCompiler
 				return Value.ToString();
 			}
 
-			public override IEnumerable<TealInstruction> ToTEAL()
+			public override StackType EvaluateTo()
+			{
+				return StackType.Uint64;
+			}
+
+			protected override IEnumerable<TealInstruction> ToTEALInternal()
 			{
 				yield return new OpcodeInstruction(Opcodes.pushint, Value);
 			}
@@ -247,7 +281,12 @@ namespace TealCompiler
 				return $"\"{Encoding.UTF8.GetString(Value)}\"";
 			}
 
-			public override IEnumerable<TealInstruction> ToTEAL()
+			public override StackType EvaluateTo()
+			{
+				return StackType.Bytes;
+			}
+
+			protected override IEnumerable<TealInstruction> ToTEALInternal()
 			{
 				yield return new OpcodeInstruction(Opcodes.pushbytes, ToString());
 			}
@@ -264,7 +303,12 @@ namespace TealCompiler
 				return Suffix ? $"{Value}{Operator}" : $"{Operator}{Value}";
 			}
 
-			public override IEnumerable<TealInstruction> ToTEAL()
+			public override StackType EvaluateTo()
+			{
+				return Value.EvaluateTo();
+			}
+
+			protected override IEnumerable<TealInstruction> ToTEALInternal()
 			{
 				foreach (var l_instruction in Value.ToTEAL()) yield return l_instruction;
 
@@ -297,7 +341,12 @@ namespace TealCompiler
 				return $"({LeftValue} {Operator} {RightValue})";
 			}
 
-			public override IEnumerable<TealInstruction> ToTEAL()
+			public override StackType EvaluateTo()
+			{
+				return LeftValue.EvaluateToBytes() || RightValue.EvaluateToBytes() ? StackType.Bytes : StackType.Uint64;
+			}
+
+			protected override IEnumerable<TealInstruction> ToTEALInternal()
 			{
 				switch (Operator)
 				{
@@ -402,8 +451,9 @@ namespace TealCompiler
 							throw new InvalidOperationException("Type []byte is not compatible with operation '**'");
 						break;
 					case "=":
-						if (LeftValue is not Variable) throw new InvalidOperationException("Trying to assign a value to something that is not a variable.");
+						if (LeftValue is not Variable l_variable) throw new InvalidOperationException("Trying to assign a value to something that is not a variable.");
 						foreach (var l_instruction in RightValue.ToTEAL()) yield return l_instruction;
+						foreach (var l_instruction in l_variable.ToAssignTEAL()) yield return l_instruction;
 						break;
 					case "==":
 						foreach (var l_instruction in LeftValue.ToTEAL()) yield return l_instruction;
@@ -586,8 +636,17 @@ namespace TealCompiler
 				return $"{FunctionName}({string.Join(", ", Parameters.Select(param => param.ToString()))})";
 			}
 
-			public override IEnumerable<TealInstruction> ToTEAL()
+			public override StackType EvaluateTo()
 			{
+				return base.EvaluateTo();
+			}
+
+			protected override IEnumerable<TealInstruction> ToTEALInternal()
+			{
+				foreach (Expression l_parameter in Parameters)
+				{
+					foreach (var l_instruction in l_parameter.ToTEAL()) yield return l_instruction;
+				}
 				yield return new OpcodeInstruction(Opcodes.callsub, FunctionName);
 			}
 		}
@@ -601,11 +660,25 @@ namespace TealCompiler
 			{
 				return $"{Operator} {Value}";
 			}
+
+			protected override IEnumerable<TealInstruction> ToTEALInternal()
+			{
+				if (Value != null)
+				{
+					foreach (var l_instruction in Value.ToTEAL())
+						yield return l_instruction;
+				}
+
+				yield return new OpcodeInstruction(Opcodes.retsub);
+			}
 		}
 
 		public class Variable : Expression
 		{
-			
+			public virtual IEnumerable<TealInstruction> ToAssignTEAL()
+			{
+				throw new InvalidOperationException("Readonly variable");
+			}
 		}
 
 		public class Reference : Variable
@@ -615,6 +688,16 @@ namespace TealCompiler
 			public override string ToString()
 			{
 				return Name;
+			}
+
+			protected override IEnumerable<TealInstruction> ToTEALInternal()
+			{
+				return base.ToTEALInternal();
+			}
+
+			public override IEnumerable<TealInstruction> ToAssignTEAL()
+			{
+				return base.ToAssignTEAL();
 			}
 		}
 

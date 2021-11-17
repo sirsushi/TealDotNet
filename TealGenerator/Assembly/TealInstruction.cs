@@ -32,4 +32,14 @@ namespace TealCompiler.TealGenerator.Assembly
 
 		public string Name { get; set; }
 	}
+
+	public class CommentInstruction : TealInstruction
+	{
+		public CommentInstruction(string p_comment)
+		{
+			Comment = p_comment;
+		}
+
+		public string Comment { get; set; }
+	}
 }

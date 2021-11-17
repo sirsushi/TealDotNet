@@ -1,12 +1,16 @@
-﻿using TealCompiler.Tokens;
+﻿using System.Collections.Generic;
+using TealCompiler.TealGenerator.Assembly;
+using TealCompiler.Tokens;
 
 namespace TealCompiler.TealGenerator
 {
-	public class Compiler
+	public abstract class Compiler<TFlags>
+		where TFlags : System.Enum
 	{
-		public static void Compile(Program p_program)
+		public IEnumerable<TealInstruction> Compile(int p_flags)
 		{
-			
+			return Compile((TFlags)(object)p_flags);
 		}
+		public abstract IEnumerable<TealInstruction> Compile(TFlags p_flags);
 	}
 }
