@@ -12,6 +12,8 @@ namespace TealDotNet.Preprocessor
 			public string Value { get; set; }
 			public Position Position { get; set; }
 			public int Length { get; set; }
+			public string Text { get; set; }
+
 			public DefineProcessor SetPos(Position startPos, int length)
 			{
 				Position = startPos;
@@ -39,16 +41,22 @@ namespace TealDotNet.Preprocessor
 			string l_processedText = p_text;
 			List<DefineProcessor> l_defines = Define.Many().Parse(p_text).ToList();
 
+			int l_index = l_defines.Count;
 			foreach (DefineProcessor l_define in l_defines.Reverse<DefineProcessor>())
 			{
+				l_define.Text = l_processedText.Substring(l_define.Position.Pos, l_define.Length);
 				l_processedText = l_processedText
-					.Remove(l_define.Position.Pos, l_define.Length);
+					.Replace(l_define.Text,
+						$"#{l_index}#");
+				l_index--;
 			}
-
+			
 			foreach (DefineProcessor l_define in l_defines)
 			{
+				l_index++;
 				l_processedText = l_processedText
-					.Replace(l_define.Name, l_define.Value);
+					.Replace(l_define.Name, l_define.Value)
+					.Replace($"#{l_index}#", l_define.Text);
 			}
 
 			return l_processedText;

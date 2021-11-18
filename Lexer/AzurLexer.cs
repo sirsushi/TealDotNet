@@ -67,10 +67,10 @@ namespace TealDotNet.Lexer
 			"&&", "||", "^", "&",
 			"|", "?", ":", "=", ".",
 			"{", "}", "(", ")", "[", "]",
-			"@", ",", ";", "!", "~"
+			",", ";", "!", "~"
 		};
 
-		private Parser<NumberToken> HexValue =>
+		private static Parser<NumberToken> HexValue =>
 			from code in Parse.IgnoreCase("0x")
 			from value in Parse.Digit.Or(Parse.Chars("aAbBcCdDeEfF")).AtLeastOnce().Text()
 			select new NumberToken()
@@ -80,7 +80,7 @@ namespace TealDotNet.Lexer
 				
 			};
 
-		private Parser<NumberToken> BinValue =>
+		private static Parser<NumberToken> BinValue =>
 			from code in Parse.IgnoreCase("0b")
 			from value in Parse.Chars("01").AtLeastOnce().Text()
 			select new NumberToken()
@@ -89,7 +89,7 @@ namespace TealDotNet.Lexer
 				Data = value
 			};
 
-		private Parser<NumberToken> OctValue =>
+		private static Parser<NumberToken> OctValue =>
 			from value in Parse.Identifier(Parse.Char('0'), Parse.Chars("01234567"))
 			select new NumberToken()
 			{
@@ -97,7 +97,7 @@ namespace TealDotNet.Lexer
 				Data = value
 			};
 
-		private Parser<NumberToken> DecValue =>
+		private static Parser<NumberToken> DecValue =>
 			from value in Parse.Digit.AtLeastOnce().Text()
 			select new NumberToken()
 			{
@@ -124,17 +124,35 @@ namespace TealDotNet.Lexer
 				Data = t
 			});
 
-		private static Parser<IdentifierToken> Text => Parse.LetterOrDigit.Or(Parse.Char('_')).Many().Text()
+		private static Parser<IdentifierToken> Identifier => Parse.Identifier(Parse.Letter, Parse.LetterOrDigit.Or(Parse.Char('_'))).Text()
 			.Select(t => new IdentifierToken()
 			{
 				Data = t
 			});
 
-		private static Parser<IEnumerable<LexerToken>> Token => StringLiteral.Or<LexerToken>(Text).Or(Symbols).Positioned().Token().Many();
+		private static Parser<StringToken> Addr =>
+			from code in Parse.Char('@')
+			from value in Parse.Regex("[A-Z0-9]+")
+			select new StringToken()
+			{
+				Data = value
+			};
+
+		private static Parser<IEnumerable<LexerToken>> Token => StringLiteral
+			.Or<LexerToken>(Identifier)
+			.Or(Addr)
+			.Or(HexValue.Or(BinValue).Or(OctValue).Or(DecValue))
+			.Or(Symbols).Positioned().Token().Many();
+
+		private static Parser<string> Defines =>
+			from action in Parse.String("#define").Token()
+			from name in Parse.Identifier(Parse.Letter, Parse.LetterOrDigit.Or(Parse.Char('_'))).Token()
+			from value in Parse.AnyChar.Until(Parse.LineTerminator).Text()
+			select "";
 
 		public static IEnumerable<LexerToken> ParseText(string p_text)
 		{
-			return Token.Parse(p_text);
+			return Defines.Token().Many().Then(_ => Token).Parse(p_text);
 		}
 	}
 }

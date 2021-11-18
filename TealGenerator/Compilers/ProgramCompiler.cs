@@ -23,6 +23,7 @@ namespace TealCompiler.TealGenerator.Compilers
 			if (l_mainFunction == null) throw new InvalidOperationException($"Can't compile {p_flags}");
 
 			l_mainFunction.Block.Find<CallInstruction>();
+			yield break;
 		}
 	}
 }

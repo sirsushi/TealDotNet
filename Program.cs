@@ -18,6 +18,7 @@ namespace TealDotNet
 			List<AzurLexer.LexerToken> l_tokens = AzurLexer.ParseText(l_processedProgramSource).ToList();
 			Program l_program = SyntaxAnalyzer.SyntaxAnalyzer.Analyze(l_tokens);
 			//File.WriteAllText("tealProgram.teal", Generator.Compile(l_program));
+			Console.WriteLine($"{l_program.Functions.Count}");
 		}
 	}
 }
