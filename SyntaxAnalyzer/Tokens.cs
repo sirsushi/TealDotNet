@@ -60,6 +60,17 @@ namespace TealCompiler
 			}
 		}
 		
+		public class DoWhileInstruction : Instruction
+		{
+			public Expression Condition { get; set; }
+			public CodeBlock Block { get; set; }
+
+			public override string ToString()
+			{
+				return $"do {Block} while {Condition}";
+			}
+		}
+		
 		public class ForInstruction : Instruction
 		{
 			public Reference Variable { get; set; }
@@ -97,14 +108,19 @@ namespace TealCompiler
 
 		public class Expression : Instruction
 		{
+			public virtual StackType EvaluateTo()
+			{
+				return StackType.Any;
+			}
+			
 			public bool EvaluateToUint64()
 			{
-				return false;
+				return EvaluateTo() == StackType.Uint64;
 			}
 
 			public bool EvaluateToBytes()
 			{
-				return false;
+				return EvaluateTo() == StackType.Bytes;
 			}
 		}
 

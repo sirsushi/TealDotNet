@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using TealCompiler.AbstractSyntaxTree;
 using TealCompiler.TealGenerator.Assembly;
-using TealCompiler.Tokens;
 
 namespace TealCompiler.TealGenerator.Compilers
 {
@@ -22,7 +22,7 @@ namespace TealCompiler.TealGenerator.Compilers
 			Function l_mainFunction = Program.Functions.FirstOrDefault(f => f.Name == p_flags.ToString());
 			if (l_mainFunction == null) throw new InvalidOperationException($"Can't compile {p_flags}");
 
-			l_mainFunction.Block.Find<CallInstruction>();
+			//l_mainFunction.Block.Find<CallInstruction>();
 			yield break;
 		}
 	}

@@ -1,6 +1,5 @@
 ﻿using System.Collections.Generic;
 using TealCompiler.TealGenerator.Assembly;
-using TealCompiler.Tokens;
 
 namespace TealCompiler.TealGenerator
 {

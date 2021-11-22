@@ -16,6 +16,7 @@
 
     <ItemGroup>
       <Compile Remove="Test.cs" />
+      <Compile Remove="Tokens.cs" />
     </ItemGroup>
 
 </Project>

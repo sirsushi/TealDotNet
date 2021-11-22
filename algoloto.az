@@ -1,7 +1,7 @@
 #define Master @ABC123
 
 def ApprovalProgram() {
-	if (Txn.Type != ApplicationCall || Txn.GroupIndex != 0) return false;
+	if (Txn.GroupIndex != 0) return false;
 	
 	// App creation
 	if (Txn.ApplicationID == 0) {
@@ -49,10 +49,10 @@ def ExecuteNoOp() {
 }
 
 def ExecuteOptIn() {
-	if (Gtxn[1].Type != Payment) exit false;
-	if (Gtxn[1].RekeyTo != Global.CurrentApplicationAddress) exit false;
-	if (Gtxn[1].Amount != 0) exit false;
-	if (Gtxn[1].Type != Payment) exit false;
+	if (TxnGroup[1].Type != Payment) exit false;
+	if (TxnGroup[1].RekeyTo != Global.CurrentApplicationAddress) exit false;
+	if (TxnGroup[1].Amount != 0) exit false;
+	if (TxnGroup[1].Type != Payment) exit false;
 	exit true;
 }
 
