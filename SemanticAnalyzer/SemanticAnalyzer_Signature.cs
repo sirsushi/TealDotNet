@@ -1,8 +1,8 @@
 ﻿using System;
 
-namespace TealDotNet.SemanticAnalyzer
+namespace TealDotNet.Semantic
 {
-	public partial class SemanticAnalyzer
+	public partial class Analyzer
 	{
 		private static void RegisterSignatureConstants()
 		{

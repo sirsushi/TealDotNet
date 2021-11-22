@@ -3,17 +3,30 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using TealCompiler.TealGenerator.Assembly;
+using TealDotNet.Lexer;
 
 namespace TealCompiler
 {
 	namespace AbstractSyntaxTree
 	{
-		public class Program
+		public class Node
+		{
+			public AzurLexer.LexerToken MainToken { get; set; }
+			public AzurLexer.LexerToken FirstToken { get; set; }
+			public AzurLexer.LexerToken LastToken { get; set; }
+
+			public string GetSourceExtract()
+			{
+				return FirstToken.Origin.Substring(FirstToken.Position.Pos,
+					LastToken.Position.Pos - FirstToken.Position.Pos + LastToken.Length);
+			}
+		}
+		public class Program : Node
 		{
 			public List<Function> Functions { get; set; } = new();
 		}
 
-		public class Function
+		public class Function : Node
 		{
 			public string Name { get; set; }
 			public List<string> Parameters { get; set; } = new();
@@ -25,7 +38,7 @@ namespace TealCompiler
 			}
 		}
 
-		public class CodeBlock
+		public class CodeBlock : Node
 		{
 			public List<Instruction> Instructions { get; set; } = new();
 
@@ -35,7 +48,8 @@ namespace TealCompiler
 			}
 		}
 
-		public class Instruction { }
+		public class Instruction : Node
+		{ }
 
 		public class IfInstruction : Instruction
 		{
@@ -95,7 +109,7 @@ namespace TealCompiler
 			}
 		}
 
-		public class SwitchCase
+		public class SwitchCase : Node
 		{
 			public List<Expression> Values { get; set; } = new();
 			public CodeBlock Block { get; set; }
@@ -108,20 +122,6 @@ namespace TealCompiler
 
 		public class Expression : Instruction
 		{
-			public virtual StackType EvaluateTo()
-			{
-				return StackType.Any;
-			}
-			
-			public bool EvaluateToUint64()
-			{
-				return EvaluateTo() == StackType.Uint64;
-			}
-
-			public bool EvaluateToBytes()
-			{
-				return EvaluateTo() == StackType.Bytes;
-			}
 		}
 
 		public class ConstExpression : Expression { }
@@ -221,7 +221,7 @@ namespace TealCompiler
 		public class MemberAccessInstruction : Variable
 		{
 			public Variable Owner { get; set; }
-			public Variable Member { get; set; }
+			public Reference Member { get; set; }
 
 			public override string ToString()
 			{

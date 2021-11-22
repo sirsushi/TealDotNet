@@ -8,6 +8,7 @@ namespace TealDotNet.Lexer
 	{
 		public class LexerToken : IPositionAware<LexerToken>
 		{
+			public string Origin { get; set; }
 			public string Data { get; set; }
 			public Position Position { get; set; }
 			public int Length { get; set; }
@@ -39,6 +40,14 @@ namespace TealDotNet.Lexer
 			public override string ToString()
 			{
 				return $"\"{Data}\" [string]";
+			}
+		}
+
+		public class CommentToken : LexerToken
+		{
+			public override string ToString()
+			{
+				return $"//{Data} [comment]";
 			}
 		}
 
@@ -138,8 +147,25 @@ namespace TealDotNet.Lexer
 				Data = value
 			};
 
+		private static Parser<CommentToken> InlineComment =>
+			from code in Parse.String("//")
+			from value in Parse.AnyChar.Until(Parse.LineTerminator).Text()
+			select new CommentToken()
+			{
+				Data = value
+			};
+
+		private static Parser<CommentToken> MultilineComment =>
+			from code in Parse.String("/*")
+			from value in Parse.AnyChar.Until(Parse.String("*/")).Text()
+			select new CommentToken()
+			{
+				Data = value
+			};
+
 		private static Parser<IEnumerable<LexerToken>> Token => StringLiteral
 			.Or<LexerToken>(Identifier)
+			.Or(InlineComment.Or(MultilineComment))
 			.Or(Addr)
 			.Or(HexValue.Or(BinValue).Or(OctValue).Or(DecValue))
 			.Or(Symbols).Positioned().Token().Many();
@@ -152,7 +178,13 @@ namespace TealDotNet.Lexer
 
 		public static IEnumerable<LexerToken> ParseText(string p_text)
 		{
-			return Defines.Token().Many().Then(_ => Token).Parse(p_text);
+			return Defines.Token().Many().Then(_ => Token)
+				.Parse(p_text)
+				.Select(t =>
+				{
+					t.Origin = p_text;
+					return t;
+				});
 		}
 	}
 }

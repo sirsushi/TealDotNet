@@ -2,15 +2,14 @@
 using System.Linq;
 using TealCompiler.AbstractSyntaxTree;
 
-namespace TealDotNet.SemanticAnalyzer
+namespace TealDotNet.Semantic
 {
-	public partial class SemanticAnalyzer
+	public partial class Analyzer
 	{
 		private class Scope
 		{
 			public bool Inherit { get; set; } = true;
-			public Dictionary<string, AzurType> Variables { get; } = new();
-			public Dictionary<string, AzurType> Constants { get; } = new();
+			public Dictionary<string, AzurField> Variables { get; } = new();
 			public Dictionary<string, Function> Functions { get; } = new();
 		}
 		
@@ -36,44 +35,41 @@ namespace TealDotNet.SemanticAnalyzer
 
 			public void RegisterVariable(string p_name)
 			{
-				CurrentScope.Variables.Add(p_name, new AzurType());
+				CurrentScope.Variables.Add(p_name, new AzurField(Types.Any));
 			}
 
 			public void RegisterVariable(string p_name, AzurType p_type)
 			{
-				CurrentScope.Variables.Add(p_name, p_type);
+				CurrentScope.Variables.Add(p_name, new AzurField(p_type));
 			}
 
 			public void RegisterConstant(string p_name)
 			{
-				CurrentScope.Constants.Add(p_name, new AzurType());
+				CurrentScope.Variables.Add(p_name, AzurField.Constant(Types.Any));
 			}
 
 			public void RegisterConstant(string p_name, AzurType p_type)
 			{
-				CurrentScope.Constants.Add(p_name, p_type);
+				CurrentScope.Variables.Add(p_name, AzurField.Constant(p_type));
 			}
 
-			public bool ReadableVariableExist(string p_name)
+			public void RegisterEnum(AzurEnum p_enum)
+			{
+				foreach (string l_value in p_enum.Values)
+				{
+					CurrentScope.Variables.Add(l_value, AzurField.Constant(p_enum));
+				}
+			}
+
+			public AzurField GetVariable(string p_name)
 			{
 				foreach (Scope l_scope in Scopes.Reverse())
 				{
-					if (l_scope.Variables.ContainsKey(p_name) || l_scope.Constants.ContainsKey(p_name)) return true;
+					if (l_scope.Variables.ContainsKey(p_name)) return l_scope.Variables[p_name];
 					if (!l_scope.Inherit) break;
 				}
 
-				return false;
-			}
-			
-			public bool WritableVariableExist(string p_name)
-			{
-				foreach (Scope l_scope in Scopes.Reverse())
-				{
-					if (l_scope.Variables.ContainsKey(p_name)) return true;
-					if (!l_scope.Inherit) break;
-				}
-
-				return false;
+				return null;
 			}
 			
 			public void RegisterFunction(Function p_function)
@@ -81,15 +77,15 @@ namespace TealDotNet.SemanticAnalyzer
 				CurrentScope.Functions.Add(p_function.Name, p_function);
 			}
 			
-			public bool FunctionExist(string p_name)
+			public Function GetFunction(string p_name)
 			{
 				foreach (Scope l_scope in Scopes.Reverse())
 				{
-					if (l_scope.Functions.ContainsKey(p_name)) return true;
+					if (l_scope.Functions.ContainsKey(p_name)) return l_scope.Functions[p_name];
 					if (!l_scope.Inherit) break;
 				}
 
-				return false;
+				return null;
 			}
 		}
 	}

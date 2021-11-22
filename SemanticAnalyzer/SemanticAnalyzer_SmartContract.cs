@@ -1,17 +1,18 @@
 ﻿using System;
 
-namespace TealDotNet.SemanticAnalyzer
+namespace TealDotNet.Semantic
 {
-	public partial class SemanticAnalyzer
+	public partial class Analyzer
 	{
 		private static void RegisterSmartContractConstants()
 		{
-			throw new NotImplementedException();
+			Data.RegisterEnum(Types.OnComplete);
+			Data.RegisterConstant("args", Types.BytesArray);
 		}
 
 		private static void RegisterSmartContractFunctions()
 		{
-			throw new NotImplementedException();
+			
 		}
 	}
 }

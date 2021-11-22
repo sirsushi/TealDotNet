@@ -9,7 +9,7 @@ def ApprovalProgram() {
 		return true;
 	}
 	
-	switch (Txn.OnComplete) {
+	switch (Txn.OnCompletion) {
 		case NoOp {
 			ExecuteNoOp();
 		}
@@ -33,17 +33,17 @@ def CreateApplication() {
 
 def ExecuteNoOp() {
 	switch (args[0]) {
-		case "open": {
+		case "open" {
 		}
-		case "close": {
+		case "close" {
 		}
-		case "draw": {
+		case "draw" {
 		}
-		case "buy": {
+		case "buy" {
 		}
-		case "claim": {
+		case "claim" {
 		}
-		case "register": {
+		case "register" {
 		}
 	}
 }
@@ -65,7 +65,7 @@ def ExecuteUpdateApplication() {
 }
 
 def ExecuteDeleteApplication() {
-	exit txt.Sender == Master;
+	exit Txn.Sender == Master;
 }
 
 def ClearStateProgram() {

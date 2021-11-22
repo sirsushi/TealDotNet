@@ -1,4 +1,4 @@
-﻿namespace TealDotNet.SyntaxAnalyzer
+﻿namespace TealDotNet.Syntax
 {
 	public static class Keywords
 	{

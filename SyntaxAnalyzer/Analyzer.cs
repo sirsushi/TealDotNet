@@ -7,9 +7,9 @@ using System.Text;
 using TealCompiler.AbstractSyntaxTree;
 using TealDotNet.Lexer;
 
-namespace TealDotNet.SyntaxAnalyzer
+namespace TealDotNet.Syntax
 {
-	public class SyntaxAnalyzer
+	public class Analyzer
 	{
 		public class SyntaxException : Exception
 		{
@@ -27,23 +27,11 @@ namespace TealDotNet.SyntaxAnalyzer
 		{
 			private List<AzurLexer.LexerToken> m_tokens;
 			private int m_index;
-			private Stack<int> m_savedIndexes;
 
 			public TokenEnumerator(List<AzurLexer.LexerToken> p_tokens)
 			{
-				m_savedIndexes = new Stack<int>();
 				m_tokens = p_tokens;
 				m_index = -1;
-			}
-
-			public void PushIndex()
-			{
-				m_savedIndexes.Push(m_index);
-			}
-
-			public void PopIndex()
-			{
-				m_index = m_savedIndexes.Pop();
 			}
 
 			public void Move(int p_index)
@@ -161,9 +149,12 @@ namespace TealDotNet.SyntaxAnalyzer
 
 		public static Program Analyze(List<AzurLexer.LexerToken> p_tokens)
 		{
-			TokenEnumerator l_enumerator = new(p_tokens);
+			TokenEnumerator l_enumerator = new(p_tokens.Where(t => t is not AzurLexer.CommentToken).ToList());
 			
 			Program l_program = new Program();
+
+			l_program.FirstToken = p_tokens.First();
+			l_program.LastToken = p_tokens.Last();
 
 			while (l_enumerator.Next() != null)
 			{
@@ -178,8 +169,12 @@ namespace TealDotNet.SyntaxAnalyzer
 		private static Function AnalyzeFunction(TokenEnumerator p_enumerator)
 		{
 			Function l_function = new();
-			
+
+			l_function.FirstToken = p_enumerator.Current;
+
 			l_function.Name = p_enumerator.NextIdentifier();
+
+			l_function.MainToken = p_enumerator.Current;
 			
 			p_enumerator.CheckSymbol("(");
 
@@ -193,6 +188,8 @@ namespace TealDotNet.SyntaxAnalyzer
 
 			l_function.Block = AnalyzeCodeBlock(p_enumerator, false);
 
+			l_function.LastToken = p_enumerator.Current;
+
 			return l_function;
 		}
 
@@ -203,15 +200,22 @@ namespace TealDotNet.SyntaxAnalyzer
 			if (p_oneLineSimplifiable && !p_enumerator.LookAhead("{"))
 			{
 				l_block.Instructions.Add(AnalyzeInstruction(p_enumerator));
+
+				l_block.FirstToken = l_block.Instructions[0].FirstToken;
+				l_block.LastToken = l_block.Instructions[0].LastToken;
 			}
 			else
 			{
 				p_enumerator.CheckSymbol("{");
 
+				l_block.FirstToken = p_enumerator.Current;
+
 				while (!p_enumerator.LookAhead("}", true))
 				{
 					l_block.Instructions.Add(AnalyzeInstruction(p_enumerator));
 				}
+
+				l_block.LastToken = p_enumerator.Current;
 			}
 
 			return l_block;
@@ -256,7 +260,11 @@ namespace TealDotNet.SyntaxAnalyzer
 		private static Instruction AnalyzeIfInstruction(TokenEnumerator p_enumerator)
 		{
 			IfInstruction l_instruction = new();
-			
+
+			l_instruction.FirstToken = p_enumerator.Current;
+
+			l_instruction.MainToken = p_enumerator.Current;
+
 			p_enumerator.CheckSymbol("(");
 
 			l_instruction.Condition = AnalyzeExpression(p_enumerator);
@@ -269,6 +277,8 @@ namespace TealDotNet.SyntaxAnalyzer
 			{
 				l_instruction.ElseBlock = AnalyzeCodeBlock(p_enumerator, true);
 			}
+
+			l_instruction.LastToken = p_enumerator.Current;
 
 			return l_instruction;
 		}
@@ -292,6 +302,10 @@ namespace TealDotNet.SyntaxAnalyzer
 		{
 			SwitchInstruction l_instruction = new();
 
+			l_instruction.FirstToken = p_enumerator.Current;
+
+			l_instruction.MainToken = p_enumerator.Current;
+
 			p_enumerator.CheckSymbol("(");
 
 			l_instruction.TestedValue = AnalyzeExpression(p_enumerator);
@@ -314,12 +328,18 @@ namespace TealDotNet.SyntaxAnalyzer
 				}
 			}
 
+			l_instruction.LastToken = p_enumerator.Current;
+
 			return l_instruction;
 		}
 
 		private static SwitchCase AnalyzeCase(TokenEnumerator p_enumerator)
 		{
 			SwitchCase l_case = new SwitchCase();
+
+			l_case.FirstToken = p_enumerator.Current;
+
+			l_case.MainToken = p_enumerator.Current;
 
 			do
 			{
@@ -328,6 +348,8 @@ namespace TealDotNet.SyntaxAnalyzer
 
 			l_case.Block = AnalyzeCodeBlock(p_enumerator, false);
 
+			l_case.LastToken = p_enumerator.Current;
+
 			return l_case;
 		}
 
@@ -335,8 +357,11 @@ namespace TealDotNet.SyntaxAnalyzer
 		{
 			return new ReturnInstruction()
 			{
+				FirstToken = p_enumerator.Current,
+				MainToken = p_enumerator.Current,
 				Operator = p_enumerator.Current.Data,
-				Value = AnalyzeExpression(p_enumerator)
+				Value = AnalyzeExpression(p_enumerator),
+				LastToken = p_enumerator.Current
 			};
 		}
 
@@ -382,7 +407,7 @@ namespace TealDotNet.SyntaxAnalyzer
 		private static Expression AnalyzeSubExpression(int p_precedence, TokenEnumerator p_enumerator)
 		{
 			List<Expression> l_subExpressions = new();
-			List<string> l_operators = new();
+			List<AzurLexer.LexerToken> l_operators = new();
 			List<AzurLexer.LexerToken> l_nextSubExpressionTokens = new();
 
 			if (p_precedence >= s_binaryOperatorPrecedence.Length) // Leaf
@@ -396,35 +421,47 @@ namespace TealDotNet.SyntaxAnalyzer
 
 				if (p_enumerator.LookAheadMany(new[] {"!", "~"}, true))
 				{
+					AzurLexer.LexerToken l_operator = p_enumerator.Current;
 					return new UnaryOperationInstruction()
 					{
-						Operator = p_enumerator.Current.Data,
-						Value = AnalyzeSubExpression(p_precedence, p_enumerator)
+						Operator = l_operator.Data,
+						FirstToken = l_operator,
+						MainToken = l_operator,
+						Value = AnalyzeSubExpression(p_precedence, p_enumerator),
+						LastToken = p_enumerator.Current
 					};
 				}
 
 				p_enumerator.Next();
 
+				Expression l_result = null;
+
 				if (p_enumerator.Current is AzurLexer.NumberToken l_number)
 				{
-					return new Uint64ConstExpression()
+					l_result = new Uint64ConstExpression()
 					{
-						Value = Convert.ToUInt64(l_number.Data, l_number.Base)
+						Value = Convert.ToUInt64(l_number.Data, l_number.Base),
+						FirstToken = l_number,
+						MainToken = l_number,
+						LastToken = l_number
 					};
 				}
-
-				if (p_enumerator.Current is AzurLexer.StringToken l_string)
+				else if (p_enumerator.Current is AzurLexer.StringToken l_string)
 				{
-					return new BytesConstExpression()
+					l_result = new BytesConstExpression()
 					{
-						Value = Encoding.UTF8.GetBytes(l_string.Data)
+						Value = Encoding.UTF8.GetBytes(l_string.Data),
+						FirstToken = l_string,
+						MainToken = l_string,
+						LastToken = l_string
 					};
 				}
-
-				if (p_enumerator.Current is AzurLexer.SymbolToken {Data: "["})
+				else if (p_enumerator.Current is AzurLexer.SymbolToken {Data: "["})
 				{
 					BytesConstExpression l_const = new BytesConstExpression();
 					List<byte> l_bytes = new List<byte>();
+
+					l_const.FirstToken = p_enumerator.Current;
 
 					while (p_enumerator.Current.Data != "]")
 					{
@@ -435,14 +472,19 @@ namespace TealDotNet.SyntaxAnalyzer
 
 					l_const.Value = l_bytes.ToArray();
 
-					return l_const;
-				}
+					l_const.LastToken = p_enumerator.Current;
 
-				if (p_enumerator.Current is AzurLexer.IdentifierToken l_identifier)
+					l_result = l_const;
+				}
+				else if (p_enumerator.Current is AzurLexer.IdentifierToken l_identifier)
 				{
+					
 					Variable l_variable = new Reference()
 					{
-						Name = l_identifier.Data
+						Name = l_identifier.Data,
+						FirstToken = l_identifier,
+						MainToken = l_identifier,
+						LastToken = l_identifier
 					};
 
 					while (p_enumerator.Next() != null)
@@ -451,6 +493,7 @@ namespace TealDotNet.SyntaxAnalyzer
 						{
 							CallInstruction l_callInstruction = new CallInstruction();
 							l_callInstruction.FunctionName = l_variable;
+							l_callInstruction.FirstToken = l_variable.FirstToken;
 							if (!p_enumerator.LookAhead(")", true))
 							{
 								do
@@ -459,27 +502,38 @@ namespace TealDotNet.SyntaxAnalyzer
 								} while (p_enumerator.CheckSymbols(",", ")") != ")");
 							}
 
+							l_callInstruction.LastToken = p_enumerator.Current;
+
 							return l_callInstruction;
 						}
 						else if (p_enumerator.Current.Data == "[")
 						{
-							l_variable = new ArrayAccessInstruction()
+							var l_arrayAccess = new ArrayAccessInstruction()
 							{
 								Array = l_variable,
+								FirstToken = l_variable.FirstToken,
 								Index = AnalyzeExpression(p_enumerator)
 							};
 							p_enumerator.CheckSymbol("]");
+
+							l_arrayAccess.LastToken = p_enumerator.Current;
+							l_variable = l_arrayAccess;
 						}
 						else if (p_enumerator.Current.Data == ".")
 						{
-							l_variable = new MemberAccessInstruction()
+							var l_memberAccess = new MemberAccessInstruction()
 							{
+								FirstToken = l_variable.FirstToken,
+								MainToken = p_enumerator.Current,
 								Member = new Reference()
 								{
 									Name = p_enumerator.NextIdentifier()
 								},
+								LastToken = p_enumerator.Current,
 								Owner = l_variable
 							};
+
+							l_variable = l_memberAccess;
 						}
 						else
 						{
@@ -489,17 +543,22 @@ namespace TealDotNet.SyntaxAnalyzer
 
 					return l_variable;
 				}
+				
+				if (p_enumerator.Next() != null || l_result == null)
+					throw new SyntaxException(p_enumerator.Current);
 
-				throw new SyntaxException("Terminal expression", p_enumerator.Current);
+				return l_result;
 			}
 
 			while (p_enumerator.Next() != null)
 			{
 				if (p_enumerator.LookMany(s_binaryOperatorPrecedence[p_precedence].List)) // Operator
 				{
+					if (l_nextSubExpressionTokens.Count == 0)
+						throw new SyntaxException(p_enumerator.Current);
 					l_subExpressions.Add(AnalyzeSubExpression(p_precedence + 1,
 						new TokenEnumerator(l_nextSubExpressionTokens)));
-					l_operators.Add(p_enumerator.Current.Data);
+					l_operators.Add(p_enumerator.Current);
 					l_nextSubExpressionTokens = new();
 				}
 				else // Operand
@@ -515,6 +574,8 @@ namespace TealDotNet.SyntaxAnalyzer
 				}
 			}
 
+			if (l_nextSubExpressionTokens.Count == 0)
+				throw new SyntaxException(l_operators.Last());
 			l_subExpressions.Add(AnalyzeSubExpression(p_precedence + 1,
 				new TokenEnumerator(l_nextSubExpressionTokens)));
 
@@ -526,9 +587,12 @@ namespace TealDotNet.SyntaxAnalyzer
 				{
 					l_expression = new BinaryOperationInstruction()
 					{
-						Operator = l_operators[i],
+						Operator = l_operators[i].Data,
 						LeftValue = l_subExpressions[i],
-						RightValue = l_expression
+						RightValue = l_expression,
+						MainToken = l_operators[i],
+						FirstToken = l_subExpressions[i].FirstToken,
+						LastToken = l_expression.LastToken
 					};
 				}
 			}
@@ -539,9 +603,12 @@ namespace TealDotNet.SyntaxAnalyzer
 				{
 					l_expression = new BinaryOperationInstruction()
 					{
-						Operator = l_operators[i - 1],
+						Operator = l_operators[i - 1].Data,
 						LeftValue = l_expression,
-						RightValue = l_subExpressions[i]
+						RightValue = l_subExpressions[i],
+						MainToken = l_operators[i - 1],
+						FirstToken = l_expression.FirstToken,
+						LastToken = l_subExpressions[i].LastToken
 					};
 				}
 			}

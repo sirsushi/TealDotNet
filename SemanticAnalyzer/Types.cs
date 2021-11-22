@@ -1,7 +1,9 @@
 using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using System.Reflection.Metadata;
 
-namespace TealDotNet.SemanticAnalyzer
+namespace TealDotNet.Semantic
 {
 	public class AzurField
 	{
@@ -11,14 +13,14 @@ namespace TealDotNet.SemanticAnalyzer
 		}
 
 		public bool ConstReference { get; set; }
-		public bool Const { get; set; }
+		public bool ConstMembers { get; set; }
 		public AzurType Type { get; set; }
 
 		public static AzurField Constant(AzurType p_type)
 		{
-			return new(Types.Uint64)
+			return new(p_type)
 			{
-				Const = true,
+				ConstMembers = true,
 				ConstReference = true
 			};
 		}
@@ -28,19 +30,27 @@ namespace TealDotNet.SemanticAnalyzer
 	{
 		public AzurType ToArray(AzurType p_index)
 		{
-			return new AzurStruct()
+			return new AzurStruct(Name+"[]")
 			{
 				Fields =
 				{
 					{"len", AzurField.Constant(Types.Uint64)}
 				},
-				ArrayAccessor =
-				{
-					{
-						p_index, new AzurField(this)
-					}
-				}
+				ArrayIndexType = p_index,
+				ArrayValue = new AzurField(this)
 			};
+		}
+
+		public virtual AzurField Get(string p_name)
+		{
+			return null;
+		}
+
+		public string Name { get; set; }
+
+		public AzurType(string p_name)
+		{
+			Name = p_name;
 		}
 	}
 	
@@ -48,23 +58,40 @@ namespace TealDotNet.SemanticAnalyzer
 	{
 		public AzurType Parent { get; set; }
 		public Dictionary<string, AzurField> Fields { get; } = new();
-		public Dictionary<AzurType, AzurField> ArrayAccessor { get; } = new();
+		public AzurType ArrayIndexType { get; set; }
+		public AzurField ArrayValue { get; set; }
+
+		public override AzurField Get(string p_name)
+		{
+			if (Fields.TryGetValue(p_name, out AzurField l_field)) return l_field;
+			if (p_name == "[]") return ArrayValue;
+			if (Parent != null) return Parent.Get(p_name);
+			return base.Get(p_name);
+		}
+
+		public AzurStruct(string p_name) : base(p_name)
+		{
+		}
 	}
 
 	public class AzurEnum : AzurType
 	{
 		public List<string> Values { get; } = new();
+
+		public AzurEnum(string p_name) : base(p_name)
+		{
+		}
 	}
 	
 	public static class Types
 	{
-		public static AzurType Any { get; } = new();
-		public static AzurType Uint64 { get; } = new();
-		public static AzurType Bytes { get; } = new();
+		public static AzurType Any { get; } = new(nameof(Any));
+		public static AzurType Uint64 { get; } = new(nameof(Uint64));
+		public static AzurType Bytes { get; } = new(nameof(Bytes));
 		public static AzurType Uint64Array { get; } = Uint64.ToArray(Uint64);
 		public static AzurType BytesArray { get; } = Bytes.ToArray(Uint64);
 
-		public static AzurEnum Hash { get; } = new AzurEnum()
+		public static AzurEnum Hash { get; } = new AzurEnum(nameof(Hash))
 		{
 			Values =
 			{
@@ -74,7 +101,7 @@ namespace TealDotNet.SemanticAnalyzer
 			}
 		};
 		
-		public static AzurEnum OnComplete { get; } = new AzurEnum()
+		public static AzurEnum OnComplete { get; } = new AzurEnum(nameof(OnComplete))
 		{
 			Values =
 			{
@@ -87,7 +114,7 @@ namespace TealDotNet.SemanticAnalyzer
 			}
 		};
 
-		public static AzurType StateSchema { get; } = new AzurStruct()
+		public static AzurType StateSchema { get; } = new AzurStruct(nameof(StateSchema))
 		{
 			Fields =
 			{
@@ -96,19 +123,17 @@ namespace TealDotNet.SemanticAnalyzer
 			}
 		};
 
-		public static AzurType State { get; set; } = new AzurStruct()
+		public static AzurType State { get; set; } = new AzurStruct(nameof(State))
 		{
 			Fields =
 			{
 				{"OptedIn", new AzurField(Uint64)}
 			},
-			ArrayAccessor =
-			{
-				{Bytes, new AzurField(Any)}
-			}
+			ArrayIndexType = Bytes,
+			ArrayValue = new AzurField(Any)
 		};
 		
-		public static AzurType AssetParam { get; } = new AzurStruct()
+		public static AzurType AssetParam { get; } = new AzurStruct(nameof(AssetParam))
 		{
 			Fields =
 			{
@@ -127,7 +152,7 @@ namespace TealDotNet.SemanticAnalyzer
 			}
 		};
 
-		public static AzurType ApplicationParam { get; } = new AzurStruct()
+		public static AzurType ApplicationParam { get; } = new AzurStruct(nameof(ApplicationParam))
 		{
 			Fields =
 			{
@@ -139,7 +164,7 @@ namespace TealDotNet.SemanticAnalyzer
 			}
 		};
 
-		public static AzurType AssetHolding { get; } = new AzurStruct()
+		public static AzurType AssetHolding { get; } = new AzurStruct(nameof(AssetHolding))
 		{
 			Fields =
 			{
@@ -148,7 +173,7 @@ namespace TealDotNet.SemanticAnalyzer
 			}
 		};
 
-		public static AzurType Asset { get; } = new AzurStruct()
+		public static AzurType Asset { get; } = new AzurStruct(nameof(Asset))
 		{
 			Fields =
 			{
@@ -157,7 +182,7 @@ namespace TealDotNet.SemanticAnalyzer
 			}
 		};
 		
-		public static AzurType Application { get; } = new AzurStruct()
+		public static AzurType Application { get; } = new AzurStruct(nameof(Application))
 		{
 			Fields =
 			{
@@ -168,7 +193,7 @@ namespace TealDotNet.SemanticAnalyzer
 			}
 		};
 		
-		public static AzurType Account { get; } = new AzurStruct()
+		public static AzurType Account { get; } = new AzurStruct(nameof(Account))
 		{
 			Fields =
 			{
@@ -179,7 +204,7 @@ namespace TealDotNet.SemanticAnalyzer
 			}
 		};
 
-		public static AzurType Global { get; } = new AzurStruct()
+		public static AzurType Global { get; } = new AzurStruct(nameof(Global))
 		{
 			Fields =
 			{
@@ -196,7 +221,7 @@ namespace TealDotNet.SemanticAnalyzer
 			}
 		};
 		
-		public static AzurType Transaction { get; } = new AzurStruct()
+		public static AzurType Transaction { get; } = new AzurStruct(nameof(Transaction))
 		{
 			Fields =
 			{
@@ -214,7 +239,7 @@ namespace TealDotNet.SemanticAnalyzer
 			}
 		};
 
-		public static AzurType PaymentTransaction { get; } = new AzurStruct()
+		public static AzurType PaymentTransaction { get; } = new AzurStruct(nameof(PaymentTransaction))
 		{
 			Parent = Transaction,
 			Fields =
@@ -226,7 +251,7 @@ namespace TealDotNet.SemanticAnalyzer
 			}
 		};
 
-		public static AzurType ParticipationTransaction { get; } = new AzurStruct()
+		public static AzurType ParticipationTransaction { get; } = new AzurStruct(nameof(ParticipationTransaction))
 		{
 			Parent = Transaction,
 			Fields =
@@ -241,7 +266,7 @@ namespace TealDotNet.SemanticAnalyzer
 			}
 		};
 
-		public static AzurType AssetTransferTransaction { get; } = new AzurStruct()
+		public static AzurType AssetTransferTransaction { get; } = new AzurStruct(nameof(AssetTransferTransaction))
 		{
 			Parent = Transaction,
 			Fields =
@@ -254,7 +279,7 @@ namespace TealDotNet.SemanticAnalyzer
 			}
 		};
 
-		public static AzurType ApplicationCallTransaction { get; } = new AzurStruct()
+		public static AzurType ApplicationCallTransaction { get; } = new AzurStruct(nameof(ApplicationCallTransaction))
 		{
 			Parent = Transaction,
 			Fields =
@@ -271,7 +296,7 @@ namespace TealDotNet.SemanticAnalyzer
 			}
 		};
 
-		public static AzurType AssetConfigurationTransaction { get; } = new AzurStruct()
+		public static AzurType AssetConfigurationTransaction { get; } = new AzurStruct(nameof(AssetConfigurationTransaction))
 		{
 			Parent = Transaction,
 			Fields =
@@ -282,7 +307,7 @@ namespace TealDotNet.SemanticAnalyzer
 			}
 		};
 
-		public static AzurType AssetFreezeTransaction { get; } = new AzurStruct()
+		public static AzurType AssetFreezeTransaction { get; } = new AzurStruct(nameof(AssetFreezeTransaction))
 		{
 			Parent = Transaction,
 			Fields =
@@ -294,7 +319,7 @@ namespace TealDotNet.SemanticAnalyzer
 			}
 		};
 
-		public static AzurType InnerTransactionResult { get; } = new AzurStruct()
+		public static AzurType InnerTransactionResult { get; } = new AzurStruct(nameof(InnerTransactionResult))
 		{
 			Fields =
 			{
