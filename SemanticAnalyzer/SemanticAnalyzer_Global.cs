@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Reflection;
 using TealCompiler.AbstractSyntaxTree;
 
 namespace TealDotNet.Semantic
@@ -9,10 +10,15 @@ namespace TealDotNet.Semantic
 		{
 			Data.RegisterConstant("Txn", Types.ApplicationCallTransaction);
 			Data.RegisterConstant("TxnGroup", Types.Transaction.ToArray(Types.Uint64));
-			Data.RegisterConstant("Global", Types.Global);
+			Data.RegisterConstant("Global", Types.System);
 
 			Data.RegisterConstant("true", Types.Uint64);
 			Data.RegisterConstant("false", Types.Uint64);
+
+			foreach (PropertyInfo l_field in typeof(Types).GetProperties(BindingFlags.Public | BindingFlags.Static))
+			{
+				Data.RegisterConstant(l_field.Name, Types.Type);
+			}
 		}
 
 		private static void RegisterGlobalFunctions()

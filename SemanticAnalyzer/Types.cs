@@ -46,6 +46,11 @@ namespace TealDotNet.Semantic
 			return null;
 		}
 
+		public virtual bool IsAssignableFrom(AzurType p_type)
+		{
+			return false;
+		}
+
 		public string Name { get; set; }
 
 		public AzurType(string p_name)
@@ -69,6 +74,13 @@ namespace TealDotNet.Semantic
 			return base.Get(p_name);
 		}
 
+		public override bool IsAssignableFrom(AzurType p_type)
+		{
+			if (p_type == this) return true;
+			if (Parent != null) return Parent.IsAssignableFrom(p_type);
+			return base.IsAssignableFrom(p_type);
+		}
+
 		public AzurStruct(string p_name) : base(p_name)
 		{
 		}
@@ -85,6 +97,7 @@ namespace TealDotNet.Semantic
 	
 	public static class Types
 	{
+		public static AzurType Type { get; } = new(nameof(Type));
 		public static AzurType Any { get; } = new(nameof(Any));
 		public static AzurType Uint64 { get; } = new(nameof(Uint64));
 		public static AzurType Bytes { get; } = new(nameof(Bytes));
@@ -204,7 +217,7 @@ namespace TealDotNet.Semantic
 			}
 		};
 
-		public static AzurType Global { get; } = new AzurStruct(nameof(Global))
+		public static AzurType System { get; } = new AzurStruct(nameof(System))
 		{
 			Fields =
 			{
@@ -327,5 +340,12 @@ namespace TealDotNet.Semantic
 				{"Logs", new AzurField(BytesArray)},
 			}
 		};
+
+		public static AzurType Get(string p_name)
+		{
+			return typeof(Types)
+				.GetProperty(p_name, BindingFlags.Static | BindingFlags.Public)
+				?.GetValue(null) as AzurType;
+		}
 	}
 }

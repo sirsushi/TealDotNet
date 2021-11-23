@@ -104,6 +104,9 @@ namespace TealDotNet.Semantic
 		private static AzurType EvaluateExpressionType(Expression p_expression)
 		{
 			if (p_expression is Variable l_variable) return GetField(l_variable, Data.GetVariable, out bool _).Type;
+			if (p_expression is BinaryOperationInstruction
+				{Operator: ":", RightValue: Reference l_castTypeReference})
+				return Types.Get(l_castTypeReference.Name);
 			return Types.Any;
 		}
 
@@ -141,18 +144,22 @@ namespace TealDotNet.Semantic
 				switch (l_blockInstructioninstr)
 				{
 					case IfInstruction l_instruction:
+						AnalyzeExpression(l_instruction.Condition);
 						if (!CanBeUint64(l_instruction.Condition))
 							throw new SemanticException(l_instruction, "Condition must be Uint64, {}");
 						AnalyzeBlock(l_instruction.IfBlock);
 						if (l_instruction.ElseBlock != null)
 							AnalyzeBlock(l_instruction.ElseBlock);
+						
 						break;
 					case SwitchInstruction l_instruction:
+						AnalyzeExpression(l_instruction.TestedValue);
 						AzurType l_testType = EvaluateExpressionType(l_instruction.TestedValue);
 						foreach (SwitchCase l_case in l_instruction.Cases)
 						{
 							foreach (Expression l_caseValue in l_case.Values)
 							{
+								AnalyzeExpression(l_caseValue);
 								if (!IsCompatible(EvaluateExpressionType(l_caseValue), l_testType))
 									throw new SemanticException(l_caseValue, $"Must be of the same type of tested value {l_testType.Name}");
 							}
@@ -192,7 +199,7 @@ namespace TealDotNet.Semantic
 					if (l_field == null)
 					{
 						if (l_assignation.LeftValue is Reference l_reference)
-							Data.RegisterVariable(l_reference.Name);
+							Data.RegisterVariable(l_reference.Name, EvaluateExpressionType(l_assignation.RightValue));
 						else
 							throw new SemanticException(l_assignation, "Left part is not assignable");
 					}
@@ -209,6 +216,32 @@ namespace TealDotNet.Semantic
 				{
 					AnalyzeExpression(l_operation.LeftValue);
 					AnalyzeExpression(l_operation.RightValue);
+					AzurType l_leftType = EvaluateExpressionType(l_operation.LeftValue);
+					AzurType l_rightType = EvaluateExpressionType(l_operation.RightValue);
+					if (l_operation.Operator == ":")
+					{
+						if (l_rightType != Types.Type)
+							throw new SemanticException(l_operation, "Cast target must be a type");
+					}
+					if (l_operation.Operator is "==" or "!=" or ":")
+					{
+						if (l_operation.RightValue is Reference l_typeReference &&
+						    l_rightType == Types.Type)
+						{
+							if (!l_leftType
+								    .IsAssignableFrom(Types.Get(l_typeReference.Name)) &&
+							    !Types.Get(l_typeReference.Name)
+								    .IsAssignableFrom(l_leftType))
+								throw new SemanticException(l_operation,
+									$"Can't cast {l_operation.LeftValue} to {l_typeReference.Name}");
+							return;
+						}
+					}
+
+					if (!IsCompatible(l_leftType, l_rightType))
+						throw new SemanticException(l_operation, "Can't operate on different type operands");
+					if (!IsBaseType(l_leftType) || !IsBaseType(l_rightType))
+						throw new SemanticException(l_operation, "Can't operate on non-basic type operands");
 					break;
 				}
 				case UnaryOperationInstruction l_operation:

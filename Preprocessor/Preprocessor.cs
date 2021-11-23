@@ -6,7 +6,7 @@ namespace TealDotNet.Preprocessor
 {
 	public class Preprocessor
 	{
-		private class DefineProcessor : IPositionAware<DefineProcessor>
+		public class DefineProcessor : IPositionAware<DefineProcessor>
 		{
 			public string Name { get; set; }
 			public string Value { get; set; }
@@ -36,30 +36,11 @@ namespace TealDotNet.Preprocessor
 			select define;
 		
 		
-		public static string ProcessText(string p_text)
+		public static List<DefineProcessor> ProcessText(string p_text)
 		{
-			string l_processedText = p_text;
 			List<DefineProcessor> l_defines = Define.Many().Parse(p_text).ToList();
 
-			int l_index = l_defines.Count;
-			foreach (DefineProcessor l_define in l_defines.Reverse<DefineProcessor>())
-			{
-				l_define.Text = l_processedText.Substring(l_define.Position.Pos, l_define.Length);
-				l_processedText = l_processedText
-					.Replace(l_define.Text,
-						$"#{l_index}#");
-				l_index--;
-			}
-			
-			foreach (DefineProcessor l_define in l_defines)
-			{
-				l_index++;
-				l_processedText = l_processedText
-					.Replace(l_define.Name, l_define.Value)
-					.Replace($"#{l_index}#", l_define.Text);
-			}
-
-			return l_processedText;
+			return l_defines;
 		}
 	}
 }

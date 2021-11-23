@@ -49,10 +49,11 @@ def ExecuteNoOp() {
 }
 
 def ExecuteOptIn() {
-	if (TxnGroup[1].Type != Payment) exit false;
-	if (TxnGroup[1].RekeyTo != Global.CurrentApplicationAddress) exit false;
-	if (TxnGroup[1].Amount != 0) exit false;
-	if (TxnGroup[1].Type != Payment) exit false;
+	if (TxnGroup[1] != PaymentTransaction) exit false;
+	rekeyTxn = TxnGroup[1] : PaymentTransaction;
+	if (rekeyTxn.RekeyTo != Global.CurrentApplication.Address) exit false;
+	if (rekeyTxn.Amount != 0) exit false;
+	if (rekeyTxn.Sender == Txn.Sender) exit false;
 	exit true;
 }
 
