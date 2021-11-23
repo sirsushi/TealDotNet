@@ -6,24 +6,46 @@ using TealCompiler.TealGenerator.Assembly;
 
 namespace TealCompiler.TealGenerator.Compilers
 {
-	public class ProgramCompiler : Compiler<ProgramCompiler.Flags>
+	public static class ProgramCompiler
 	{
-		public enum Flags
+		public static void Compile(this Program p_program, CompiledProgramState p_state)
 		{
-			ApprovalProgram,
-			ClearStateProgram,
-			Contract
-		}
-		public Program Program { get; set; }
+			Function l_mainFunction = null;
+			if (p_state.IsFlagSet(CompilerFlags.ApprovalProgram))
+				l_mainFunction = p_program.Functions.First(f => f.Name == "ApprovalProgram");
+			else if (p_state.IsFlagSet(CompilerFlags.ClearStateProgram))
+				l_mainFunction = p_program.Functions.First(f => f.Name == "ClearStateProgram");
+			else if (p_state.IsFlagSet(CompilerFlags.Signature))
+				l_mainFunction = p_program.Functions.First(f => f.Name == "Signature");
 
+			if (l_mainFunction == null) return;
+			
+			List<Function> l_usedFunctions = new();
+			Queue<Function> l_functionsToTest = new();
+			l_functionsToTest.Enqueue(l_mainFunction);
+			while (l_functionsToTest.Count > 0)
+			{
+				Function l_nextFunctionToTest = l_functionsToTest.Dequeue();
+				l_usedFunctions.Add(l_nextFunctionToTest);
+				List<CallInstruction> l_calls = l_nextFunctionToTest.Find<CallInstruction>().ToList();
+				foreach (CallInstruction l_call in l_calls)
+				{
+					Function l_function = p_program.Functions.First(f => f.Name == l_call.FunctionRef.Name);
+					if (!l_usedFunctions.Contains(l_function))
+					{
+						l_functionsToTest.Enqueue(l_function);
+					}
+				}
+			}
 
-		public override IEnumerable<TealInstruction> Compile(Flags p_flags)
-		{
-			Function l_mainFunction = Program.Functions.FirstOrDefault(f => f.Name == p_flags.ToString());
-			if (l_mainFunction == null) throw new InvalidOperationException($"Can't compile {p_flags}");
-
-			//l_mainFunction.Block.Find<CallInstruction>();
-			yield break;
+			foreach (Function l_function in l_usedFunctions)
+			{
+				if (l_function == l_mainFunction)
+					p_state.SetFlag(CompilerFlags.MainFunction);
+				else
+					p_state.ResetFlag(CompilerFlags.MainFunction);
+				l_function.Compile(p_state);
+			}
 		}
 	}
 }

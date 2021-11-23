@@ -156,6 +156,12 @@ namespace TealDotNet.Syntax
 			l_program.FirstToken = p_tokens.First();
 			l_program.LastToken = p_tokens.Last();
 
+			while (!l_enumerator.LookAhead("def"))
+			{
+				l_program.Constants.Add(AnalyzeExpression(l_enumerator));
+				l_enumerator.CheckSymbol(";");
+			}
+
 			while (l_enumerator.Next() != null)
 			{
 				if (l_enumerator.Current is not AzurLexer.IdentifierToken {Data: Keywords.Def})
@@ -355,13 +361,17 @@ namespace TealDotNet.Syntax
 
 		private static Instruction AnalyzeReturnInstruction(TokenEnumerator p_enumerator)
 		{
+			Expression l_value = null;
+			var l_operator = p_enumerator.Current;
+			if (!p_enumerator.LookAhead(";") || l_operator.Data != "return")
+				l_value = AnalyzeExpression(p_enumerator);
 			return new ReturnInstruction()
 			{
-				FirstToken = p_enumerator.Current,
-				MainToken = p_enumerator.Current,
-				Operator = p_enumerator.Current.Data,
-				Value = AnalyzeExpression(p_enumerator),
-				LastToken = p_enumerator.Current
+				FirstToken = l_operator,
+				MainToken = l_operator,
+				Operator = l_operator.Data,
+				Value = l_value,
+				LastToken = l_value?.LastToken ?? l_operator
 			};
 		}
 
@@ -491,8 +501,10 @@ namespace TealDotNet.Syntax
 					{
 						if (p_enumerator.Current.Data == "(") // Call
 						{
+							if (l_variable is not Reference l_reference)
+								throw new SyntaxException(p_enumerator.Current);
 							CallInstruction l_callInstruction = new CallInstruction();
-							l_callInstruction.FunctionName = l_variable;
+							l_callInstruction.FunctionRef = l_reference;
 							l_callInstruction.FirstToken = l_variable.FirstToken;
 							if (!p_enumerator.LookAhead(")", true))
 							{

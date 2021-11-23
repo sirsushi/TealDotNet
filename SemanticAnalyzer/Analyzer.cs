@@ -60,6 +60,14 @@ namespace TealDotNet.Semantic
 			{
 				Data.RegisterFunction(l_function);
 			}
+
+			foreach (Expression l_expression in p_program.Constants)
+			{
+				if (l_expression is not BinaryOperationInstruction {Operator: "="} l_operation ||
+				    l_operation.LeftValue is not Reference l_constantReference)
+					throw new SemanticException(l_expression, "Can only do constant assignation outside of a function");
+				Data.RegisterConstant(l_constantReference.Name, EvaluateExpressionType(l_operation.RightValue));
+			}
 			
 			if (p_flags.HasFlag(Flags.ApprovalProgram))
 			{
@@ -101,15 +109,6 @@ namespace TealDotNet.Semantic
 			Data.ExitScope();
 		}
 
-		private static AzurType EvaluateExpressionType(Expression p_expression)
-		{
-			if (p_expression is Variable l_variable) return GetField(l_variable, Data.GetVariable, out bool _).Type;
-			if (p_expression is BinaryOperationInstruction
-				{Operator: ":", RightValue: Reference l_castTypeReference})
-				return Types.Get(l_castTypeReference.Name);
-			return Types.Any;
-		}
-
 		private static bool CanBeUint64(Expression p_expression)
 		{
 			AzurType l_type = EvaluateExpressionType(p_expression);
@@ -133,183 +132,6 @@ namespace TealDotNet.Semantic
 			}
 
 			return p_type1 == p_type2;
-		}
-
-		private static void AnalyzeBlock(CodeBlock p_block)
-		{
-			Data.EnterScope();
-
-			foreach (Instruction l_blockInstructioninstr in p_block.Instructions)
-			{
-				switch (l_blockInstructioninstr)
-				{
-					case IfInstruction l_instruction:
-						AnalyzeExpression(l_instruction.Condition);
-						if (!CanBeUint64(l_instruction.Condition))
-							throw new SemanticException(l_instruction, "Condition must be Uint64, {}");
-						AnalyzeBlock(l_instruction.IfBlock);
-						if (l_instruction.ElseBlock != null)
-							AnalyzeBlock(l_instruction.ElseBlock);
-						
-						break;
-					case SwitchInstruction l_instruction:
-						AnalyzeExpression(l_instruction.TestedValue);
-						AzurType l_testType = EvaluateExpressionType(l_instruction.TestedValue);
-						foreach (SwitchCase l_case in l_instruction.Cases)
-						{
-							foreach (Expression l_caseValue in l_case.Values)
-							{
-								AnalyzeExpression(l_caseValue);
-								if (!IsCompatible(EvaluateExpressionType(l_caseValue), l_testType))
-									throw new SemanticException(l_caseValue, $"Must be of the same type of tested value {l_testType.Name}");
-							}
-							AnalyzeBlock(l_case.Block);
-						}
-						if (l_instruction.DefaultCase != null)
-							AnalyzeBlock(l_instruction.DefaultCase);
-						break;
-					case ForInstruction l_instruction:
-						break;
-					case WhileInstruction l_instruction:
-						break;
-					case DoWhileInstruction l_instruction:
-						break;
-					case ReturnInstruction l_instruction:
-						AnalyzeExpression(l_instruction.Value);
-						break;
-					case Expression l_instruction:
-						AnalyzeExpression(l_instruction);
-						break;
-				}
-			}
-			
-			Data.ExitScope();
-		}
-
-		private static void AnalyzeExpression(Expression p_expression)
-		{
-			switch (p_expression)
-			{
-				case BinaryOperationInstruction {Operator: "="} l_assignation:
-				{
-					if (l_assignation.LeftValue is not Variable)
-						throw new SemanticException(l_assignation, "Left part is not assignable");
-					AzurField l_field = GetField(l_assignation.LeftValue as Variable, Data.GetVariable,
-						out bool l_writable);
-					if (l_field == null)
-					{
-						if (l_assignation.LeftValue is Reference l_reference)
-							Data.RegisterVariable(l_reference.Name, EvaluateExpressionType(l_assignation.RightValue));
-						else
-							throw new SemanticException(l_assignation, "Left part is not assignable");
-					}
-					else
-					{
-						if (l_field.ConstReference || !l_writable)
-							throw new SemanticException(l_assignation, "Left part is not assignable");
-					}
-
-					AnalyzeExpression(l_assignation.RightValue);
-					break;
-				}
-				case BinaryOperationInstruction l_operation:
-				{
-					AnalyzeExpression(l_operation.LeftValue);
-					AnalyzeExpression(l_operation.RightValue);
-					AzurType l_leftType = EvaluateExpressionType(l_operation.LeftValue);
-					AzurType l_rightType = EvaluateExpressionType(l_operation.RightValue);
-					if (l_operation.Operator == ":")
-					{
-						if (l_rightType != Types.Type)
-							throw new SemanticException(l_operation, "Cast target must be a type");
-					}
-					if (l_operation.Operator is "==" or "!=" or ":")
-					{
-						if (l_operation.RightValue is Reference l_typeReference &&
-						    l_rightType == Types.Type)
-						{
-							if (!l_leftType
-								    .IsAssignableFrom(Types.Get(l_typeReference.Name)) &&
-							    !Types.Get(l_typeReference.Name)
-								    .IsAssignableFrom(l_leftType))
-								throw new SemanticException(l_operation,
-									$"Can't cast {l_operation.LeftValue} to {l_typeReference.Name}");
-							return;
-						}
-					}
-
-					if (!IsCompatible(l_leftType, l_rightType))
-						throw new SemanticException(l_operation, "Can't operate on different type operands");
-					if (!IsBaseType(l_leftType) || !IsBaseType(l_rightType))
-						throw new SemanticException(l_operation, "Can't operate on non-basic type operands");
-					break;
-				}
-				case UnaryOperationInstruction l_operation:
-				{
-					AnalyzeExpression(l_operation.Value);
-					break;
-				}
-				case Variable l_variable:
-				{
-					AzurField l_field = GetField(l_variable, Data.GetVariable, out bool _);
-					if (l_field == null) throw new SemanticException(l_variable, "Variable is not declared before first use");
-					break;
-				}
-			}
-		}
-
-		private static AzurField GetField(Variable p_variable, Func<string, AzurField> p_fieldGetter, out bool p_writable)
-		{
-			AzurField l_field = null;
-			p_writable = true;
-			
-			switch (p_variable)
-			{
-				case CallInstruction l_call:
-				{
-					var l_functionReference = l_call.FunctionName as Reference;
-					if (Data.GetFunction(l_functionReference.Name) == null)
-						throw new SemanticException(l_call, "Function not defined");
-					l_field = AzurField.Constant(Types.Any);
-					p_writable = false;
-					break;
-				}
-				case Reference l_reference:
-				{
-					l_field = p_fieldGetter(l_reference.Name);
-					if (l_field != null)
-						p_writable = !l_field.ConstMembers;
-					break;
-				}
-				case MemberAccessInstruction l_memberAccess:
-				{
-					l_field = GetField(l_memberAccess.Owner, p_fieldGetter, out p_writable);
-					if (l_field == null)
-						throw new SemanticException(l_memberAccess.Owner, "Variable is not declared before first use");
-					l_field = GetField(l_memberAccess.Member, l_field.Type.Get, out bool l_memberWritable);
-					if (l_field == null) throw new SemanticException(l_memberAccess,
-						$"{l_memberAccess.Member.Name} is not part of {EvaluateExpressionType(l_memberAccess.Owner).Name}");
-					p_writable &= l_memberWritable;
-					break;
-				}
-				case ArrayAccessInstruction l_arrayAccess:
-				{
-					l_field = GetField(l_arrayAccess.Array, p_fieldGetter, out p_writable);
-					if (l_field == null)
-						throw new SemanticException(l_arrayAccess, "Variable is not declared before first use");
-					l_field = l_field.Type.Get("[]");
-					if (l_field == null) throw new SemanticException(l_arrayAccess,
-						$"{EvaluateExpressionType(l_arrayAccess.Array).Name} doesn't have a [] accessor");
-					p_writable &= !l_field.ConstMembers;
-					AnalyzeExpression(l_arrayAccess.Index);
-					
-					break;
-				}
-				default:
-					throw new SemanticException(p_variable, "Unmanaged token");
-			}
-
-			return l_field;
 		}
 	}
 }

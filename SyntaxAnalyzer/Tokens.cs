@@ -20,10 +20,31 @@ namespace TealCompiler
 				return FirstToken.Origin.Substring(FirstToken.Position.Pos,
 					LastToken.Position.Pos - FirstToken.Position.Pos + LastToken.Length);
 			}
+
+			public IEnumerable<T> Find<T>() where T : Node
+			{
+				if (this is T) yield return this as T;
+
+				foreach (T l_child in FindChildren().SelectMany(c => c.Find<T>()))
+				{
+					yield return l_child;
+				}
+			}
+
+			public virtual IEnumerable<Node> FindChildren()
+			{
+				yield break;
+			}
 		}
 		public class Program : Node
 		{
-			public List<Function> Functions { get; set; } = new();
+			public List<Expression> Constants { get; } = new();
+			public List<Function> Functions { get; } = new();
+
+			public override IEnumerable<Node> FindChildren()
+			{
+				return Constants.Concat<Node>(Functions);
+			}
 		}
 
 		public class Function : Node
@@ -36,6 +57,11 @@ namespace TealCompiler
 			{
 				return $"{Name}({string.Join(", ", Parameters)})";
 			}
+
+			public override IEnumerable<Node> FindChildren()
+			{
+				yield return Block;
+			}
 		}
 
 		public class CodeBlock : Node
@@ -45,6 +71,11 @@ namespace TealCompiler
 			public override string ToString()
 			{
 				return $"{{{Instructions.Count}}}";
+			}
+
+			public override IEnumerable<Node> FindChildren()
+			{
+				return Instructions;
 			}
 		}
 
@@ -61,6 +92,14 @@ namespace TealCompiler
 			{
 				return $"if {Condition} {IfBlock}" + (ElseBlock != null ? $"else {ElseBlock}" : "");
 			}
+
+			public override IEnumerable<Node> FindChildren()
+			{
+				yield return Condition;
+				yield return IfBlock;
+				if (ElseBlock != null)
+					yield return ElseBlock;
+			}
 		}
 
 		public class WhileInstruction : Instruction
@@ -72,6 +111,12 @@ namespace TealCompiler
 			{
 				return $"while {Condition} {Block}";
 			}
+
+			public override IEnumerable<Node> FindChildren()
+			{
+				yield return Condition;
+				yield return Block;
+			}
 		}
 		
 		public class DoWhileInstruction : Instruction
@@ -82,6 +127,12 @@ namespace TealCompiler
 			public override string ToString()
 			{
 				return $"do {Block} while {Condition}";
+			}
+
+			public override IEnumerable<Node> FindChildren()
+			{
+				yield return Condition;
+				yield return Block;
 			}
 		}
 		
@@ -95,6 +146,13 @@ namespace TealCompiler
 			{
 				return $"for {Variable} in {Range} {Block}";
 			}
+
+			public override IEnumerable<Node> FindChildren()
+			{
+				yield return Variable;
+				yield return Range;
+				yield return Block;
+			}
 		}
 
 		public class SwitchInstruction : Instruction
@@ -107,6 +165,18 @@ namespace TealCompiler
 			{
 				return $"switch {TestedValue} {{ {(Cases.Count > 0 ? $"{Cases.Count} case(s)" : "")} {(DefaultCase != null ? "+ default" : "")} }}";
 			}
+
+			public override IEnumerable<Node> FindChildren()
+			{
+				yield return TestedValue;
+				foreach (SwitchCase l_case in Cases)
+				{
+					yield return l_case;
+				}
+
+				if (DefaultCase != null)
+					yield return DefaultCase;
+			}
 		}
 
 		public class SwitchCase : Node
@@ -117,6 +187,15 @@ namespace TealCompiler
 			public override string ToString()
 			{
 				return $"case {Values.Select(v => v.ToString()).Aggregate((v1, v2) => $"{v1}, {v2}")} {Block}";
+			}
+
+			public override IEnumerable<Node> FindChildren()
+			{
+				foreach (Expression l_value in Values)
+				{
+					yield return l_value;
+				}
+				yield return Block;
 			}
 		}
 
@@ -139,10 +218,15 @@ namespace TealCompiler
 		public class BytesConstExpression : ConstExpression
 		{
 			public byte[] Value { get; set; }
+
+			public string GetUTF8String()
+			{
+				return Encoding.UTF8.GetString(Value);
+			}
 			
 			public override string ToString()
 			{
-				return $"\"{Encoding.UTF8.GetString(Value)}\"";
+				return $"\"{GetUTF8String()}\"";
 			}
 		}
 
@@ -156,6 +240,11 @@ namespace TealCompiler
 			{
 				return Suffix ? $"{Value}{Operator}" : $"{Operator}{Value}";
 			}
+
+			public override IEnumerable<Node> FindChildren()
+			{
+				yield return Value;
+			}
 		}
 		
 		public class BinaryOperationInstruction : Expression
@@ -168,16 +257,31 @@ namespace TealCompiler
 			{
 				return $"({LeftValue} {Operator} {RightValue})";
 			}
+
+			public override IEnumerable<Node> FindChildren()
+			{
+				yield return LeftValue;
+				yield return RightValue;
+			}
 		}
 
 		public class CallInstruction : Variable
 		{
-			public Variable FunctionName { get; set; }
+			public Reference FunctionRef { get; set; }
 			public List<Expression> Parameters { get; set; } = new();
 
 			public override string ToString()
 			{
-				return $"{FunctionName}({string.Join(", ", Parameters.Select(param => param.ToString()))})";
+				return $"{FunctionRef}({string.Join(", ", Parameters.Select(param => param.ToString()))})";
+			}
+
+			public override IEnumerable<Node> FindChildren()
+			{
+				yield return FunctionRef;
+				foreach (Expression l_parameter in Parameters)
+				{
+					yield return l_parameter;
+				}
 			}
 		}
 
@@ -189,6 +293,11 @@ namespace TealCompiler
 			public override string ToString()
 			{
 				return $"{Operator} {Value}";
+			}
+
+			public override IEnumerable<Node> FindChildren()
+			{
+				yield return Value;
 			}
 		}
 
@@ -216,6 +325,12 @@ namespace TealCompiler
 			{
 				return $"{Array}[{Index}]";
 			}
+
+			public override IEnumerable<Node> FindChildren()
+			{
+				yield return Array;
+				yield return Index;
+			}
 		}
 		
 		public class MemberAccessInstruction : Variable
@@ -226,6 +341,12 @@ namespace TealCompiler
 			public override string ToString()
 			{
 				return $"{Owner}.{Member}";
+			}
+
+			public override IEnumerable<Node> FindChildren()
+			{
+				yield return Owner;
+				yield return Member;
 			}
 		}
 	}

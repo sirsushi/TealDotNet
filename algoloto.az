@@ -1,7 +1,9 @@
-#define Master @ABC123
+Master = @ABC123;
 
 def ApprovalProgram() {
 	if (Txn.GroupIndex != 0) return false;
+	
+	a = 2 * 2;
 	
 	// App creation
 	if (Txn.ApplicationID == 0) {
@@ -54,6 +56,7 @@ def ExecuteOptIn() {
 	if (rekeyTxn.RekeyTo != Global.CurrentApplication.Address) exit false;
 	if (rekeyTxn.Amount != 0) exit false;
 	if (rekeyTxn.Sender == Txn.Sender) exit false;
+	if (rekeyTxn.Sender == Master) exit false;
 	exit true;
 }
 

@@ -1,15 +1,15 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using TealCompiler.TealGenerator.Assembly;
 
 namespace TealCompiler.TealGenerator
 {
-	public abstract class Compiler<TFlags>
-		where TFlags : System.Enum
+	[Flags]
+	public enum CompilerFlags
 	{
-		public IEnumerable<TealInstruction> Compile(int p_flags)
-		{
-			return Compile((TFlags)(object)p_flags);
-		}
-		public abstract IEnumerable<TealInstruction> Compile(TFlags p_flags);
+		ApprovalProgram = 1,
+		ClearStateProgram = 2,
+		Signature = 4,
+		MainFunction = 8
 	}
 }
