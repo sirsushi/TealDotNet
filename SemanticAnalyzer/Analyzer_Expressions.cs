@@ -101,7 +101,7 @@ namespace TealDotNet.Semantic
 			AnalyzeExpression(l_assignation.RightValue);
 		}
 
-		private static AzurType EvaluateExpressionType(Expression p_expression)
+		public static AzurType EvaluateExpressionType(this Expression p_expression)
 		{
 			if (p_expression is Variable l_variable) return GetField(l_variable, Data.GetVariable, out bool _).Type;
 			if (p_expression is BinaryOperationInstruction

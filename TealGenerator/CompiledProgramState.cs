@@ -1,5 +1,8 @@
 ﻿using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
 using TealCompiler.TealGenerator.Assembly;
+using TealDotNet.Semantic;
 
 namespace TealCompiler.TealGenerator
 {
@@ -12,7 +15,10 @@ namespace TealCompiler.TealGenerator
 
 		private CompilerFlags Flags { get; set; }
 		private List<TealInstruction> Output { get; } = new();
-		private Stack<string> StackTracker { get; } = new();
+		private Stack<StackType> StackTracker { get; } = new();
+		private Dictionary<string, int> VariablesPosition { get; } = new();
+
+		private Stack<int> StackOffset { get; } = new();
 
 		public void SetFlag(CompilerFlags p_flags)
 		{
@@ -31,7 +37,18 @@ namespace TealCompiler.TealGenerator
 
 		public void Write(Opcode p_opcode, params object[] p_params)
 		{
+			foreach (StackType l_type in p_opcode.Pops.Reverse())
+			{
+				if (StackTracker.Pop() == l_type || l_type == StackType.Any)
+					throw new CompilationException("Wrong stacked type");
+			}
+			
 			Output.Add(new OpcodeInstruction(p_opcode, p_params));
+
+			foreach (StackType l_type in p_opcode.Pushes)
+			{
+				StackTracker.Push(l_type);
+			}
 		}
 
 		public void Labelize(string p_label)
@@ -44,9 +61,14 @@ namespace TealCompiler.TealGenerator
 			Output.Add(new CommentInstruction(p_comment));
 		}
 
-		public void Stack()
+		public void RegisterVariablePosition(string p_variableName)
 		{
-			
+			VariablesPosition[p_variableName] = StackTracker.Count;
+		}
+
+		public int GetVariablePosition(string p_variableName)
+		{
+			return StackTracker.Count - VariablesPosition[p_variableName];
 		}
 	}
 }

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Buffers.Text;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -222,6 +223,14 @@ namespace TealCompiler
 			public string GetUTF8String()
 			{
 				return Encoding.UTF8.GetString(Value);
+			}
+
+			public string GetBase64String()
+			{
+				byte[] l_base64 = new byte[Value.Length * 4 / 3];
+				Span<byte> l_span = new Span<byte>(l_base64);
+				Base64.EncodeToUtf8(new ReadOnlySpan<byte>(Value), l_span, out int l_consumed, out int l_written);
+				return Encoding.UTF8.GetString(l_base64);
 			}
 			
 			public override string ToString()

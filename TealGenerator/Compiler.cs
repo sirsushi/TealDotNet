@@ -12,4 +12,11 @@ namespace TealCompiler.TealGenerator
 		Signature = 4,
 		MainFunction = 8
 	}
+
+	public class CompilationException : Exception
+	{
+		public CompilationException(string? message) : base(message)
+		{
+		}
+	}
 }

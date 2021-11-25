@@ -6,7 +6,7 @@ using TealCompiler.AbstractSyntaxTree;
 
 namespace TealDotNet.Semantic
 {
-	public partial class Analyzer
+	public static partial class Analyzer
 	{
 		[Flags]
 		public enum Flags
