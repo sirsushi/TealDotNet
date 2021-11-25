@@ -14,7 +14,7 @@ namespace TealCompiler.TealGenerator
 		}
 
 		private CompilerFlags Flags { get; set; }
-		private List<TealInstruction> Output { get; } = new();
+		public List<TealInstruction> Output { get; } = new();
 		private Stack<StackType> StackTracker { get; } = new();
 		private Dictionary<string, int> VariablesPosition { get; } = new();
 
@@ -39,7 +39,8 @@ namespace TealCompiler.TealGenerator
 		{
 			foreach (StackType l_type in p_opcode.Pops.Reverse())
 			{
-				if (StackTracker.Pop() == l_type || l_type == StackType.Any)
+				var l_poped = StackTracker.Pop();
+				if (l_poped != l_type && l_type != StackType.Any && l_poped != StackType.Any)
 					throw new CompilationException("Wrong stacked type");
 			}
 			
@@ -61,9 +62,21 @@ namespace TealCompiler.TealGenerator
 			Output.Add(new CommentInstruction(p_comment));
 		}
 
+		public bool IsVariableRegistered(string p_variableName)
+		{
+			return VariablesPosition.ContainsKey(p_variableName);
+		}
+
 		public void RegisterVariablePosition(string p_variableName)
 		{
+			Write(Opcodes.pushint, 0);
 			VariablesPosition[p_variableName] = StackTracker.Count;
+		}
+
+		public void UnregisterVariablePosition(string p_variableName)
+		{
+			Write(Opcodes.pop);
+			VariablesPosition.Remove(p_variableName);
 		}
 
 		public int GetVariablePosition(string p_variableName)

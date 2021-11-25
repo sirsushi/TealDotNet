@@ -58,7 +58,26 @@ namespace TealCompiler.TealGenerator.Compilers
 		private static void ReadVariable(Variable p_variable, CompiledProgramState p_state)
 		{
 			if (p_variable is Reference l_reference)
-				p_state.Write(Opcodes.dig, p_state.GetVariablePosition(l_reference.Name));
+			{
+				switch (l_reference.Name)
+				{
+					case "true":
+					{
+						p_state.Write(Opcodes.pushint, 1);
+						break;
+					}
+					case "false":
+					{
+						p_state.Write(Opcodes.pushint, 0);
+						break;
+					}
+					default:
+					{
+						p_state.Write(Opcodes.dig, p_state.GetVariablePosition(l_reference.Name));
+						break;
+					}
+				}
+			}
 		}
 	}
 }

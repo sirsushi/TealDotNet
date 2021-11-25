@@ -21,6 +21,11 @@ namespace TealCompiler.TealGenerator.Assembly
 
 		public Opcode Opcode { get; set; }
 		public object[] Params { get; set; }
+
+		public override string ToString()
+		{
+			return $"{Opcode.Name} {string.Join(' ', Params)}";
+		}
 	}
 
 	public class LabelInstruction : TealInstruction
@@ -31,6 +36,11 @@ namespace TealCompiler.TealGenerator.Assembly
 		}
 
 		public string Name { get; set; }
+
+		public override string ToString()
+		{
+			return $"{Name}:";
+		}
 	}
 
 	public class CommentInstruction : TealInstruction
@@ -41,5 +51,10 @@ namespace TealCompiler.TealGenerator.Assembly
 		}
 
 		public string Comment { get; set; }
+
+		public override string ToString()
+		{
+			return $"//{Comment}";
+		}
 	}
 }

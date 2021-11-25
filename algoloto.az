@@ -3,8 +3,6 @@ Master = @ABC123;
 def ApprovalProgram() {
 	if (Txn.GroupIndex != 0) return false;
 	
-	a = 2 * 2;
-	
 	// App creation
 	if (Txn.ApplicationID == 0) {
 		CreateApplication();

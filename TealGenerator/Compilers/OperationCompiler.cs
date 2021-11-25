@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using TealCompiler.AbstractSyntaxTree;
+using TealCompiler.TealGenerator.Assembly;
 
 namespace TealCompiler.TealGenerator.Compilers
 {
@@ -10,8 +11,10 @@ namespace TealCompiler.TealGenerator.Compilers
 		{
 			Dictionary<string, Action<BinaryOperationInstruction, CompiledProgramState>> l_compilers = new()
 			{
-				{"=", CompileAssignation}
+				{"=", CompileAssignation},
+				{"+", CompileAdd}
 			};
+			l_compilers[p_operation.Operator](p_operation, p_state);
 		}
 
 		private static void CompileAssignation(BinaryOperationInstruction p_operation, CompiledProgramState p_state)
@@ -20,8 +23,18 @@ namespace TealCompiler.TealGenerator.Compilers
 
 			if (p_operation.LeftValue is Reference l_reference)
 			{
-				p_state.RegisterVariablePosition(l_reference.Name);
+				int l_position = p_state.GetVariablePosition(l_reference.Name);
+				p_state.Write(Opcodes.uncover, l_position);
+				p_state.Write(Opcodes.pop);
+				p_state.Write(Opcodes.cover, l_position - 1);
 			}
+		}
+
+		private static void CompileAdd(BinaryOperationInstruction p_operation, CompiledProgramState p_state)
+		{
+			p_operation.LeftValue.Compile(p_state);
+			p_operation.RightValue.Compile(p_state);
+			p_state.Write(Opcodes.add);
 		}
 	}
 }
